@@ -1,0 +1,510 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>СтройМаркет — объявления</title>
+  <link rel="stylesheet" href="frontend/css/styles.css">
+    <script>
+      // shared auth helper
+    </script>
+    <script src="frontend/js/auth.js"></script>
+</head>
+<body>
+  <header class="header main-header" id="mainHeader">
+    <div class="top_header header-inner container">
+      <div class="logo-wrap">
+        <a class="logo" href="index.html">
+          <span class="brand">BUILDSTORE</span>
+        </a>
+        <div class="hammer" id="hammer" title="Строительный молоток" aria-hidden="true">
+          🔨
+        </div>
+      </div>
+
+      <nav class="main-nav" id="mainNav">
+        <a href="index.html">Главная</a>
+        <a href="frontend/listings.html">Категории</a>
+        <a href="#">Для бизнеса</a>
+        <a href="#">Доставка</a>
+        <a href="#">Контакты</a>
+      </nav>
+
+      <div class="header-actions">
+        <div class="auth-links">
+          <a href="frontend/auth.html" id="loginLink">Вход</a>
+          <a href="frontend/reg.html" id="regLink">Регистрация</a>
+        </div>
+
+        <div class="cart" id="cartBtn" title="Корзина">
+          🛒 <span class="cart-badge" id="cartBadge">0</span>
+        </div>
+
+        <a class="btn add-listing" href="frontend/add.html" id="addBtn">Добавить объявление</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hero video banner -->
+  <div class="hero" id="hero">
+    <video autoplay muted loop playsinline id="heroVideo">
+      <source src="frontend/img/hero.mp4" type="video/mp4">
+    </video>
+    <div class="overlay"></div>
+    <div class="hero-content">
+      <h1>Ваш строительный маркетплейс нового поколения</h1>
+      <p class="hero-sub">Быстро. Надежно. Без посредников.</p>
+      <div class="hero-stats">📦 5000+ товаров | 🚚 Доставка по всей России | 💼 B2B &amp; B2C</div>
+      <div class="search-box hero-search">
+        <select id="heroCategory">
+          <option value="">Выберите категорию</option>
+          <option>Материалы</option>
+          <option>Инструменты</option>
+          <option>Техника</option>
+        </select>
+        <input id="heroQuery" type="text" placeholder="Введите название товара...">
+        <button id="heroFind" class="btn">🔍 Найти</button>
+      </div>
+      <button id="watchVideoBtn" class="btn secondary" style="margin-top:12px; display:none;">Посмотреть видео</button>
+    </div>
+  </div>
+
+  <main class="container" style="padding-top:18px">
+    <!-- Как это работает: интерактивный аккордеон (3 шага) -->
+    <section aria-label="Как это работает" class="how-it-works container" id="howItWorks">
+      <h2>Как это работает</h2>
+      <div class="accordion">
+        <div class="accordion-item" data-step="1">
+          <button class="accordion-head">
+            <span class="icon icon-hammer" aria-hidden="true">🔨</span>
+            <span class="head-title">Шаг 1 — Выбираете товар</span>
+            <span class="chev">▾</span>
+          </button>
+          <div class="accordion-body">
+            <p>Выбираете нужный материал или инструмент и добавляете в корзину. Мы показываем проверенных продавцов и наличие на складе.</p>
+          </div>
+        </div>
+
+        <div class="accordion-item" data-step="2">
+          <button class="accordion-head">
+            <span class="icon icon-truck" aria-hidden="true">🚚</span>
+            <span class="head-title">Шаг 2 — Оформляете доставку</span>
+            <span class="chev">▾</span>
+          </button>
+          <div class="accordion-body">
+            <p>Выбираете удобный способ доставки или самовывоз. Мы показываем сроки и стоимость сразу.</p>
+          </div>
+        </div>
+
+        <div class="accordion-item" data-step="3">
+          <button class="accordion-head">
+            <span class="icon icon-check" aria-hidden="true">✅</span>
+            <span class="head-title">Шаг 3 — Получаете и проверяете</span>
+            <span class="chev">▾</span>
+          </button>
+          <div class="accordion-body">
+            <p>При получении вы осматриваете товар и при необходимости оформляете возврат. Оставляете отзыв и помогаете другим.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+    <!-- Категории и фильтры перенесены в страницу списка (listings.html) -->
+
+    <footer class="footer">
+      © 2025 СтройМаркет — учебный проект. Все права принадлежат автору проекта.
+    </footer>
+  </main>
+
+  <script>
+    // 🔹 Показываем email пользователя вместо кнопки входа и добавляем выход
+    // Исправлено: ранее скрипт ожидал элементы с id=userSection/authBtn, которых нет в разметке.
+    document.addEventListener('DOMContentLoaded', () => {
+      const authLinksContainer = document.querySelector('.auth-links');
+      const loginLink = document.getElementById('loginLink');
+      const regLink = document.getElementById('regLink');
+      const userEmail = sessionStorage.getItem('userEmail');
+
+      if (userEmail && authLinksContainer) {
+        // Скрываем ссылки вход/регистрация, если они есть
+        if (loginLink) loginLink.style.display = 'none';
+        if (regLink) regLink.style.display = 'none';
+
+        // Создаём ссылку на личный кабинет
+        const profileLink = document.createElement('a');
+        profileLink.className = 'btn secondary';
+        profileLink.href = 'frontend/dashboard.html';
+        profileLink.textContent = userEmail;
+
+        // Кнопка выхода
+        const logoutBtn = document.createElement('button');
+        logoutBtn.className = 'btn';
+        logoutBtn.textContent = 'Выйти';
+        logoutBtn.addEventListener('click', () => {
+          sessionStorage.removeItem('userEmail');
+          sessionStorage.removeItem('token');
+          // Опционально: очистить localStorage если там есть токен
+          localStorage.removeItem('token');
+          window.location.reload();
+        });
+
+        authLinksContainer.appendChild(profileLink);
+        authLinksContainer.appendChild(logoutBtn);
+      }
+    });
+
+    // 🔹 Загрузка списка объявлений
+    async function loadListings(q = '') {
+      // store latest raw results so filters can operate client-side
+      window.__latestListings = window.__latestListings || [];
+      const root = document.getElementById('listings');
+      // показываем мини-анимацию загрузки
+      root.innerHTML = `
+        <div style="display:flex;justify-content:center;padding:24px;">
+          <div class="boxes" aria-hidden="true">
+            <div class="box"><div></div><div></div><div></div><div></div></div>
+            <div class="box"><div></div><div></div><div></div><div></div></div>
+            <div class="box"><div></div><div></div><div></div><div></div></div>
+            <div class="box"><div></div><div></div><div></div><div></div></div>
+          </div>
+        </div>
+      `;
+      try {
+  const res = await fetch('/api/listings' + (q ? ('?q=' + encodeURIComponent(q)) : ''));
+        const data = await res.json();
+        if (!Array.isArray(data)) {
+          root.innerText = 'Ошибка формата ответа';
+          return;
+        }
+        if (data.length === 0) {
+          root.innerHTML = '<div>Объявлений пока нет.</div>';
+          return;
+        }
+        root.innerHTML = '';
+  // cache results
+  window.__latestListings = data;
+
+  data.forEach((item, idx) => {
+          const card = document.createElement('article');
+          card.className = 'card';
+          // preview: prefer video if provided, otherwise image
+          const hasVideo = item.videoPath || item.videoBase64;
+          const imgUrl = item.imagePath || (item.imageBase64 ? (`data:image/*;base64,${item.imageBase64}`) : `https://picsum.photos/seed/${encodeURIComponent(item.title)}/400/300`);
+          const videoUrl = item.videoPath || (item.videoBase64 ? (`data:video/mp4;base64,${item.videoBase64}`) : '');
+          const priceText = item.price ? (item.price + ' ₽') : 'Цена по договорённости';
+          const discount = item.discount || 0; // optional field
+          const rating = item.rating || 0;
+          const reviews = item.reviewsCount || 0;
+          const inStock = (item.in_stock === undefined) ? (item.stock ? true : false) : Boolean(item.in_stock);
+          const isHot = item.is_hot || (item.tags && item.tags.indexOf('hot') !== -1);
+          card.innerHTML = `
+            <div class="preview">
+              ${hasVideo ? (`<video class="preview-video" muted loop playsinline preload="metadata"><source src="${videoUrl}" type="video/mp4"></video>`) : (`<img class="thumb" src="${imgUrl}" alt="${item.title}">`)}
+              ${discount ? `<div class="discount">-${discount}%</div>` : ''}
+              ${isHot ? `<div class="hot-badge">🔥 Хит продаж</div>` : ''}
+            </div>
+            <div class="meta">
+              <div>
+                <div class="title">${item.title}</div>
+                <div class="muted small">${item.category || ''} • ${item.location || ''}</div>
+                <div class="rating">⭐ ${rating} (${reviews})</div>
+              </div>
+              <div style="display:flex; flex-direction:column; align-items:flex-end; gap:8px;">
+                <div style="display:flex; gap:8px; align-items:center;">
+                  <div class="price">${priceText}</div>
+                </div>
+                <div class="stock">${inStock ? '✅ В наличии' : '❌ Нет в наличии'}</div>
+                <a class="btn open-btn" href="frontend/listings.html?id=${item.id}">Открыть →</a>
+              </div>
+            </div>
+          `;
+          card.classList.add('slide-in');
+          root.appendChild(card);
+          // add animate-in with small stagger
+          setTimeout(()=> card.classList.add('animate-in'), 80 * idx + 50);
+        });
+        // populate category tiles based on results (unique categories)
+        populateCategoryTiles(window.__latestListings);
+      } catch (e) {
+        root.innerText = 'Не удалось загрузить объявления.';
+        console.error(e);
+      }
+    }
+
+    // Populate category tiles dynamically
+    function populateCategoryTiles(listings){
+      const container = document.getElementById('categoryTiles');
+      if(!container) return;
+      const cats = Array.from(new Set(listings.map(it => it.category).filter(Boolean)));
+      // keep existing default tiles if any; clear and render canonical set
+      container.innerHTML = '';
+      // Add an 'Все' tile
+      const allBtn = document.createElement('button');
+      allBtn.className = 'category-tile active';
+      allBtn.dataset.cat = '';
+      allBtn.textContent = 'Все';
+      container.appendChild(allBtn);
+      cats.forEach(c => {
+        const b = document.createElement('button');
+        b.className = 'category-tile';
+        b.dataset.cat = c;
+        b.textContent = c;
+        container.appendChild(b);
+      });
+      // attach events
+      container.querySelectorAll('.category-tile').forEach(btn => btn.addEventListener('click', onCategoryTileClick));
+    }
+
+    function onCategoryTileClick(e){
+      const btn = e.currentTarget;
+      const cat = btn.dataset.cat || '';
+      // set active
+      document.querySelectorAll('.category-tile').forEach(b=>b.classList.remove('active'));
+      btn.classList.add('active');
+      // show filtersPanel when a specific category selected
+      const panel = document.getElementById('filtersPanel');
+      if(panel) panel.hidden = !cat;
+      // apply client-side filter
+      applyFilters({ category: cat });
+    }
+
+    // Apply filters to cached listings and re-render results
+    function applyFilters(extra = {}){
+      let list = (window.__latestListings || []).slice();
+      const inStock = document.getElementById('fInStock')?.checked;
+      const onlyDiscount = document.getElementById('fDiscount')?.checked;
+      const minRating = Number(document.getElementById('fRating')?.value || 0);
+      const maxPrice = Number(document.getElementById('fMaxPrice')?.value || 0) || 0;
+      const category = (extra.category !== undefined) ? extra.category : (document.querySelector('.category-tile.active')?.dataset.cat || '');
+
+      if(category) list = list.filter(i => (i.category || '') === category);
+      if(inStock) list = list.filter(i => (i.in_stock === undefined) ? Boolean(i.stock) : Boolean(i.in_stock));
+      if(onlyDiscount) list = list.filter(i => Number(i.discount) > 0);
+      if(minRating) list = list.filter(i => Number(i.rating || 0) >= minRating);
+      if(maxPrice) list = list.filter(i => Number(i.price || 0) <= maxPrice);
+
+      // render filtered list (reuse rendering logic but simple)
+      const root = document.getElementById('listings');
+      root.innerHTML = '';
+      if(list.length === 0){ root.innerHTML = '<div>Подходящих объявлений не найдено.</div>'; return; }
+      list.forEach((item, idx) => {
+        const card = document.createElement('article');
+        card.className = 'card';
+        const hasVideo = item.videoPath || item.videoBase64;
+        const imgUrl = item.imagePath || (item.imageBase64 ? (`data:image/*;base64,${item.imageBase64}`) : `https://picsum.photos/seed/${encodeURIComponent(item.title)}/400/300`);
+        const videoUrl = item.videoPath || (item.videoBase64 ? (`data:video/mp4;base64,${item.videoBase64}`) : '');
+        const priceText = item.price ? (item.price + ' ₽') : 'Цена по договорённости';
+        const discount = item.discount || 0;
+        const rating = item.rating || 0;
+        const reviews = item.reviewsCount || 0;
+        const inStock = (item.in_stock === undefined) ? (item.stock ? true : false) : Boolean(item.in_stock);
+        const isHot = item.is_hot || (item.tags && item.tags.indexOf('hot') !== -1);
+        card.innerHTML = `
+          <div class="preview">
+            ${hasVideo ? (`<video class="preview-video" muted loop playsinline preload="metadata"><source src="${videoUrl}" type="video/mp4"></video>`) : (`<img class="thumb" src="${imgUrl}" alt="${item.title}">`)}
+            ${discount ? `<div class="discount">-${discount}%</div>` : ''}
+            ${isHot ? `<div class="hot-badge">🔥 Хит продаж</div>` : ''}
+          </div>
+          <div class="meta">
+            <div>
+              <div class="title">${item.title}</div>
+              <div class="muted small">${item.category || ''} • ${item.location || ''}</div>
+              <div class="rating">⭐ ${rating} (${reviews})</div>
+            </div>
+            <div style="display:flex; flex-direction:column; align-items:flex-end; gap:8px;">
+              <div style="display:flex; gap:8px; align-items:center;">
+                <div class="price">${priceText}</div>
+              </div>
+              <div class="stock">${inStock ? '✅ В наличии' : '❌ Нет в наличии'}</div>
+              <a class="btn open-btn" href="frontend/listings.html?id=${item.id}">Открыть →</a>
+            </div>
+          </div>
+        `;
+        root.appendChild(card);
+        setTimeout(()=> card.classList.add('animate-in'), 80 * idx + 50);
+      });
+    }
+
+    // filters actions
+    const applyBtn = document.getElementById('applyFilters');
+    if(applyBtn) applyBtn.addEventListener('click', ()=> applyFilters({}));
+    const clearBtn = document.getElementById('clearFilters');
+    if(clearBtn) clearBtn.addEventListener('click', ()=>{
+      document.getElementById('fInStock').checked = false;
+      document.getElementById('fDiscount').checked = false;
+      document.getElementById('fRating').value = '0';
+      document.getElementById('fMaxPrice').value = '';
+      // reset category to all
+      document.querySelectorAll('.category-tile').forEach(b=>b.classList.remove('active'));
+      document.querySelector('.category-tile[data-cat=""]')?.classList.add('active');
+      document.getElementById('filtersPanel').hidden = true;
+      applyFilters({ category: '' });
+    });
+
+    // Поддержка Enter в поле поиска hero (главный поиск)
+    const heroQueryInput = document.getElementById('heroQuery');
+    if (heroQueryInput){
+      heroQueryInput.addEventListener('keydown', (e)=>{
+        if(e.key === 'Enter'){
+          const cat = document.getElementById('heroCategory').value || '';
+          const qv = heroQueryInput.value.trim() || '';
+          const q = [cat, qv].filter(Boolean).join(' ');
+          history.replaceState(null, '', q ? ('?q=' + encodeURIComponent(q)) : window.location.pathname);
+          loadListings(q);
+        }
+      });
+    }
+
+    // По клику по категории — делаем поиск по ней (используем heroQuery вместо удалённого searchInput)
+    document.querySelectorAll('.category').forEach(el => {
+      el.addEventListener('click', () => {
+        const q = el.textContent.trim();
+        const heroQ = document.getElementById('heroQuery');
+        if(heroQ) heroQ.value = q;
+        history.replaceState(null, '', '?q=' + encodeURIComponent(q));
+        loadListings(q);
+      });
+    });
+
+    // Если в URL есть q при загрузке — заполним heroQuery и выполним поиск
+    const initParams = new URLSearchParams(window.location.search);
+    const initQ = initParams.get('q');
+    if (initQ) {
+      const heroQuery = document.getElementById('heroQuery');
+      if(heroQuery) heroQuery.value = initQ;
+      loadListings(initQ);
+    }
+
+    // 🔹 Загрузка при старте
+    // при старте возьмём q из URL если есть
+    const startParams = new URLSearchParams(window.location.search);
+    const startQ = startParams.get('q') || '';
+    if(startQ) {
+      const heroQuery = document.getElementById('heroQuery');
+      if(heroQuery) heroQuery.value = startQ;
+    }
+    loadListings(startQ);
+
+    // header interactions
+    const headerEl = document.getElementById('mainHeader');
+    let lastScroll = 0;
+    window.addEventListener('scroll', ()=>{
+      const y = window.scrollY;
+      if(y > 60) headerEl.classList.add('shrink'); else headerEl.classList.remove('shrink');
+      lastScroll = y;
+    });
+
+    // hammer hover: small bounce when hovered
+    const hammer = document.getElementById('hammer');
+    if(hammer){
+      hammer.addEventListener('mouseenter', ()=>{ hammer.style.transform = 'translateY(-2px) scale(1.08)'; });
+      hammer.addEventListener('mouseleave', ()=>{ hammer.style.transform = ''; });
+    }
+
+    // cart add demo: animation when cartBadge increments
+    const cartBadge = document.getElementById('cartBadge');
+    const cartBtn = document.getElementById('cartBtn');
+    function addToCartDemo(){
+      let n = Number(cartBadge.textContent || '0'); n++; cartBadge.textContent = n; cartBtn.classList.add('added'); setTimeout(()=>cartBtn.classList.remove('added'),700);
+    }
+    // For demo: clicking the cart will simulate adding
+    cartBtn.addEventListener('click', ()=> addToCartDemo());
+
+    // Hero search wiring: combine category + query, call loadListings and animate cards
+    const heroFind = document.getElementById('heroFind');
+    if(heroFind){
+      heroFind.addEventListener('click', ()=>{
+        const cat = document.getElementById('heroCategory').value || '';
+        const qv = document.getElementById('heroQuery').value.trim() || '';
+        const qstr = [cat, qv].filter(Boolean).join(' ');
+        // animate existing cards out
+        document.querySelectorAll('#listings .card').forEach((c,i)=>{ c.classList.add('slide-in'); setTimeout(()=>c.remove(), 350 + i*60); });
+        loadListings(qstr);
+      });
+    }
+
+    // Watch video button for mobile (opens video in a new small modal)
+    const watchBtn = document.getElementById('watchVideoBtn');
+    if(watchBtn){
+      watchBtn.addEventListener('click', ()=>{
+        const vsrc = document.getElementById('heroVideo').querySelector('source').src;
+        const w = window.open('', 'heroVideo', 'width=800,height=460');
+        w.document.write(`<video src="${vsrc}" controls autoplay style="width:100%"></video>`);
+      });
+    }
+
+    // Ensure hero video stays looping and resumes when possible
+    (function ensureHeroVideoLoop(){
+      const heroVideo = document.getElementById('heroVideo');
+      if(!heroVideo) return;
+      // enforce desirable attributes
+      try { heroVideo.muted = true; } catch(e){}
+      try { heroVideo.loop = true; } catch(e){}
+      try { heroVideo.playsInline = true; } catch(e){}
+      try { heroVideo.preload = 'auto'; } catch(e){}
+
+      // If the browser somehow stops the loop, restart on ended
+      heroVideo.addEventListener('ended', ()=>{
+        try{ heroVideo.currentTime = 0; heroVideo.play().catch(()=>{}); }catch(e){}
+      });
+
+      // When tab becomes visible again, try to play (some browsers pause in background)
+      document.addEventListener('visibilitychange', ()=>{
+        if(!document.hidden){
+          heroVideo.play().catch(()=>{});
+        }
+      });
+
+      // If video is paused unexpectedly while page visible, attempt to resume
+      heroVideo.addEventListener('pause', ()=>{
+        if(!document.hidden){
+          setTimeout(()=> heroVideo.play().catch(()=>{}), 150);
+        }
+      });
+
+      // On stall or error try to reload and play
+      heroVideo.addEventListener('stalled', ()=>{ heroVideo.load(); heroVideo.play().catch(()=>{}); });
+      heroVideo.addEventListener('error', ()=>{ setTimeout(()=>{ heroVideo.load(); heroVideo.play().catch(()=>{}); }, 300); });
+
+      // Pause other non-essential videos (e.g. listing previews) to reduce autoplay throttling
+      setTimeout(()=>{
+        document.querySelectorAll('video').forEach(v => {
+          if(v === heroVideo) return;
+          // only pause preview videos created for cards
+          if(v.classList.contains('preview-video')){
+            try{ v.pause(); }catch(e){}
+          }
+        });
+        // try to play hero after briefly pausing others
+        heroVideo.play().catch(()=>{});
+      }, 250);
+    })();
+
+    // Как это работает — аккордеон
+    (function setupAccordion(){
+      const items = document.querySelectorAll('.accordion-item');
+      items.forEach(it => {
+        const head = it.querySelector('.accordion-head');
+        const body = it.querySelector('.accordion-body');
+        const icon = it.querySelector('.icon');
+        head.addEventListener('click', ()=>{
+          const isOpen = body.classList.contains('open');
+          // close all
+          document.querySelectorAll('.accordion-body.open').forEach(b=>{ b.classList.remove('open'); b.style.maxHeight = null; });
+          document.querySelectorAll('.accordion-item .icon.open').forEach(ic=>ic.classList.remove('open'));
+          if(!isOpen){
+            body.classList.add('open');
+            body.style.maxHeight = body.scrollHeight + 'px';
+            if(icon) icon.classList.add('open');
+            // special icon animation for hammer on step 1
+            if(it.dataset.step === '1'){
+              icon.classList.add('swing');
+              setTimeout(()=> icon.classList.remove('swing'), 900);
+            }
+          }
+        });
+      });
+    })();
+  </script>
+  
+</body>
+</html>
