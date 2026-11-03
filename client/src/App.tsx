@@ -1,9 +1,14 @@
 // Таблица маршрутов: какой адрес какую страницу показывает (docs/REACT_MIGRATION.md, раздел 3).
 import { Route, Routes } from 'react-router-dom';
 import Layout from './components/Layout';
+import ProtectedRoute from './components/ProtectedRoute';
+import CartPage from './pages/CartPage';
+import CatalogPage from './pages/CatalogPage';
 import HomePage from './pages/HomePage';
 import NotFoundPage from './pages/NotFoundPage';
+import OrdersPage from './pages/OrdersPage';
 import PlaceholderPage from './pages/PlaceholderPage';
+import ProductPage from './pages/ProductPage';
 
 export default function App() {
   return (
@@ -12,10 +17,14 @@ export default function App() {
       <Route element={<Layout />}>
         <Route path="/" element={<HomePage />} />
 
-        <Route path="/catalog" element={<PlaceholderPage title="Каталог" />} />
-        <Route path="/product/:id" element={<PlaceholderPage title="Товар" />} />
-        <Route path="/cart" element={<PlaceholderPage title="Корзина" />} />
-        <Route path="/orders" element={<PlaceholderPage title="Мои заказы" />} />
+        <Route path="/catalog" element={<CatalogPage />} />
+        <Route path="/product/:id" element={<ProductPage />} />
+        <Route path="/cart" element={<CartPage />} />
+
+        {/* Только для вошедших */}
+        <Route element={<ProtectedRoute />}>
+          <Route path="/orders" element={<OrdersPage />} />
+        </Route>
 
         <Route path="/login" element={<PlaceholderPage title="Вход" />} />
         <Route path="/register" element={<PlaceholderPage title="Регистрация" />} />

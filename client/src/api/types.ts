@@ -107,8 +107,8 @@ export interface OrderItem {
   listing_id: number;
   quantity: number;
   price_at_purchase: string;
-  title: string;
-  category: Category;
+  title: string | null; // null: объявление уже удалено из базы
+  category: Category | null;
   imagePath: string;
   description?: string | null; // есть только в GET /orders/:id
 }
