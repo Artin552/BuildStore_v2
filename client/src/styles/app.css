@@ -1,0 +1,155 @@
+/* Дополнения только для React-клиента. styles.css оставляем как есть, чтобы его можно было сравнить со старым. */
+
+/* Футер прижат к низу экрана, даже если на странице мало содержимого */
+.app-shell {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+.app-main { flex: 1; }
+
+/* Кнопки шапки стоят в один ряд, а текст в них не переносится */
+.auth-links { display: flex; align-items: center; gap: 8px; }
+.auth-links a { margin: 0; white-space: nowrap; }
+.add-listing-link { white-space: nowrap; }
+
+/* Правило .auth-links a красит текст серым и перебивает цвет кнопок. Возвращаем их цвета */
+.auth-links a.btn-primary,
+.auth-links a.btn-primary:hover { color: #fff; }
+.auth-links a.btn-secondary,
+.auth-links a.btn-secondary:hover { color: var(--primary); }
+[data-theme="dark"] .auth-links a.btn-primary,
+[data-theme="dark"] .auth-links a.btn-primary:hover { color: #0e2140; }
+
+/* Узкий экран, но бургера ещё нет: всё в ряд не помещается, поэтому у кнопки остаётся только плюс */
+@media (min-width: 901px) and (max-width: 1100px) {
+  .main-nav, .header-actions { gap: 8px; }
+  .add-listing-label { display: none; }
+}
+
+/* Кнопки внутри блоков «пусто / ошибка» */
+.empty-state-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 16px; }
+
+/* Неактивные кнопки: например, «Нет в наличии» или «Предыдущая» на первой странице */
+.btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* Быстрые теги и плитки каталога теперь ссылки, а не кнопки */
+.quick-tag { display: inline-flex; align-items: center; }
+[data-theme="dark"] a.category-card { color: var(--text); }
+.category-card:hover { color: var(--text); }
+
+/* Каталог */
+.catalog-back { margin-bottom: 12px; }
+.catalog-search { margin-bottom: 20px; }
+.catalog-search input { color: var(--text); }
+.catalog-count { margin: 0 0 12px; font-size: 14px; }
+.pagination button:disabled { opacity: 0.5; }
+
+/* Корзина: стили перенесены из <style> в старом frontend/cart.html */
+.cart-item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  margin-bottom: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+}
+.cart-item-image { width: 80px; height: 80px; object-fit: cover; border-radius: 4px; flex-shrink: 0; }
+.cart-item-info { flex: 1; min-width: 200px; }
+.cart-item-title { display: block; font-weight: 600; margin-bottom: 8px; }
+.cart-item-price { color: var(--primary); font-weight: 700; }
+.cart-item-quantity { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.cart-item-quantity .btn { min-width: 44px; }
+.cart-item-quantity .quantity-input { width: 72px; text-align: center; }
+.cart-item-remove {
+  min-height: 44px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 4px;
+  background: rgba(220, 38, 38, 0.12);
+  color: var(--danger);
+  font-size: 14px;
+  cursor: pointer;
+}
+.cart-item-remove:hover { background: rgba(220, 38, 38, 0.2); }
+.cart-summary {
+  max-width: 400px;
+  margin: 20px 0 0 auto;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+}
+.cart-summary-row { display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 16px; }
+.cart-summary-total {
+  padding-top: 12px;
+  border-top: 2px solid var(--border);
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--primary);
+}
+.cart-summary-note { font-size: 13px; }
+.cart-summary-action { width: 100%; margin-top: 8px; }
+
+/* Заказы: стили перенесены из <style> в старом frontend/orders.html, цвета заменены на переменные темы */
+.orders-page { max-width: 800px; }
+.order-card {
+  margin-bottom: 16px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+}
+.order-header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
+.order-number { font-size: 18px; font-weight: 700; color: var(--primary); }
+.order-date { font-size: 14px; color: var(--muted); }
+.order-total { font-size: 18px; font-weight: 700; color: var(--primary); }
+.order-status { display: inline-block; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+.order-status.pending { background: #fff3cd; color: #856404; }
+.order-status.confirmed { background: #d1ecf1; color: #0c5460; }
+.order-status.shipped { background: #e7d4f5; color: #663399; }
+.order-status.delivered { background: #d4edda; color: #155724; }
+.order-status.cancelled { background: #f8d7da; color: #721c24; }
+.order-items { padding-top: 12px; border-top: 1px solid var(--border); }
+.order-item-row { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; font-size: 14px; }
+.order-item-name { flex: 1; }
+
+/* Бургер: квадратная кнопка без стандартной рамки браузера, удобная для пальца */
+.mobile-menu-btn {
+  width: 44px;
+  height: 44px;
+  padding: 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+}
+
+/* До 900px шапка в ряд не помещается, поэтому работает бургер. В styles.css порог 768px,
+   здесь те же правила меню действуют и на планшетах. Открытое меню — столбик без выхода за край экрана */
+@media (max-width: 900px) {
+  .mobile-menu-btn { display: block; }
+  .main-nav {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    padding: 12px;
+    background: var(--card);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    z-index: 60;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  .main-nav.active { display: flex; }
+  .main-nav > a { padding: 10px 6px; }
+  .header-actions { flex-wrap: wrap; justify-content: flex-start; }
+  .cart-link { margin-right: 8px; }
+}

@@ -8,6 +8,22 @@ const { roleToJwt } = authUtils;
 // Категории, для которых сертификат/паспорт товара обязателен для организаций (ТЗ 7.2).
 // Уточняется у заказчика (ТЗ 9); по умолчанию — электроинструмент и СИЗ.
 const CERT_REQUIRED_CATEGORIES = ['Электроинструмент', 'СИЗ'];
+// Единый список категорий. Точно такой же список должен быть в index.html
+// и add.html — иначе «Крепёж» и «Крепеж» становятся разными категориями.
+const CATEGORIES = ['Материалы', 'Инструменты', 'Электроинструмент', 'СИЗ', 'Техника', 'Крепёж'];
+
+// Цена — только число от 0 и больше. Раньше «договорная» проходила проверку
+// (NaN < 0 — это false), а потом ломала фильтры и оформление заказа.
+function parsePrice(value) {
+  const text = String(value == null ? '' : value).trim().replace(',', '.');
+  if (!/^\d+(\.\d{1,2})?$/.test(text)) return null;
+  const num = Number(text);
+  return Number.isFinite(num) && num >= 0 && num <= 1e9 ? String(num) : null;
+}
+
+// Безопасное превращение текстовой цены в число прямо в SQL:
+// если в старых записях лежит текст, получится NULL, а не ошибка всего запроса
+const PRICE_NUM = "(CASE WHEN price ~ '^[0-9]+(\\.[0-9]+)?$' THEN price::numeric END)";
 
 // Информация о продавце объявления (ТЗ 7.1): тип аккаунта, статус верификации,
 // название организации. Один запрос на весь список — без N+1.
@@ -39,13 +55,20 @@ const fs = require('fs');
 const path = require('path');
 const fileType = require('file-type');
 
-// Форматирование объявления для API
+// Форматирование объявления для API.
+// PostgreSQL хранит имена колонок маленькими буквами: imagePath → imagepath,
+// certificatePath → certificatepath, reviewsCount → reviewscount.
+// Раньше код читал listing.imagePath (undefined), и картинки не показывались вообще.
 function formatListing(listing) {
   if (!listing) return null;
+  const { imagepath, certificatepath, reviewscount, ...rest } = listing;
+  const image = listing.imagePath || imagepath || '';
+  const cert = listing.certificatePath || certificatepath || '';
   return {
-    ...listing,
-    imagePath: listing.imagePath ? '/uploads/' + listing.imagePath : '',
-    certificatePath: listing.certificatePath ? '/uploads/certificates/' + listing.certificatePath : ''
+    ...rest,
+    reviewsCount: listing.reviewsCount ?? reviewscount ?? 0,
+    imagePath: image ? '/uploads/' + image : '',
+    certificatePath: cert ? '/uploads/certificates/' + cert : ''
   };
 }
 
@@ -96,29 +119,38 @@ router.get('/', (req, res) => {
     where.push('rating >= ?'); params.push(minRating);
   }
   if (minPrice) {
-    where.push('CAST(price AS INTEGER) >= ?'); params.push(minPrice);
+    where.push(`${PRICE_NUM} >= ?`); params.push(minPrice);
   }
   if (maxPrice) {
-    where.push('CAST(price AS INTEGER) <= ?'); params.push(maxPrice);
+    where.push(`${PRICE_NUM} <= ?`); params.push(maxPrice);
+  }
+  // Снятые модератором объявления не показываем обычным посетителям (ТЗ 6.3).
+  // Условие добавляем ДО подсчёта, чтобы X-Total-Count совпадал с выдачей.
+  // Свои объявления (mine=true) владелец видит все, включая снятые.
+  if (!mine) {
+    where.push("COALESCE(moderation_status, 'published') <> 'removed'");
   }
 
   const whereSql = where.length ? (' WHERE ' + where.join(' AND ')) : '';
 
   const countSql = `SELECT COUNT(*) as cnt ${baseSql} ${whereSql}`;
   db.get(countSql, params, (cErr, cRow) => {
-    if (cErr) return res.status(500).json({ error: 'DB error' });
+   if (cErr) {
+      console.error('❌ Ошибка подсчёта объявлений:', cErr.message);
+      return res.status(500).json({ error: 'DB error' });
+    }
     const total = cRow ? cRow.cnt : 0;
 
     const offset = (page - 1) * limit;
     // Поля in_stock/rating/discount/reviewsCount/is_hot/tags используются фильтрами
     // и бейджами фронтенда — не отдавать их здесь означает сломанные фильтры на клиенте
-    // Снятые модератором объявления не показываем обычным посетителям (ТЗ 6.3)
-    where.push("COALESCE(moderation_status, 'published') <> 'removed'");
-    const whereSql2 = where.length ? (' WHERE ' + where.join(' AND ')) : '';
-    const sql = `SELECT id, title, category, price, description, imagePath, created_at, owner_id, discount, rating, reviewsCount, in_stock, is_hot, tags, certificatePath ${baseSql} ${whereSql2} ORDER BY created_at DESC LIMIT ? OFFSET ?`;
+     const sql = `SELECT id, title, category, price, description, imagePath, created_at, owner_id, discount, rating, reviewsCount, in_stock, is_hot, tags, certificatePath, moderation_status, removal_reason ${baseSql} ${whereSql} ORDER BY created_at DESC LIMIT ? OFFSET ?`;
     const finalParams = params.concat([limit, offset]);
     db.all(sql, finalParams, (err, rows) => {
-      if (err) return res.status(500).json({ error: 'DB error' });
+        if (err) {
+        console.error('❌ Ошибка загрузки объявлений:', err.message);
+        return res.status(500).json({ error: 'DB error' });
+      }
       const mapped = (rows || []).map(formatListing);
       attachSellerInfo(mapped, () => {
         res.set('X-Total-Count', total);
@@ -134,6 +166,11 @@ router.get('/:id', (req, res) => {
   db.get('SELECT * FROM listings WHERE id = ?', [id], (err, row) => {
     if (err) return res.status(500).json({ error: 'DB error' });
     if (!row) return res.status(404).json({ error: 'Not found' });
+    // Снятое модератором объявление видит только его владелец
+    const viewer = getUserFromAuthHeader(req);
+    if (row.moderation_status === 'removed' && !(viewer && viewer.id === row.owner_id)) {
+      return res.status(404).json({ error: 'Объявление снято с публикации' });
+    }
     const item = formatListing(row);
     attachSellerInfo([item], () => res.json(item));
   });
@@ -144,9 +181,11 @@ router.post('/', async (req, res) => {
   const jwtUser = getUserFromAuthHeader(req);
   if (!jwtUser) return res.status(401).json({ error: 'Unauthorized' });
 
-  const { title, category, price, description, imageBase64, certificateBase64 } = req.body;
+  const { title, category, description, imageBase64, certificateBase64 } = req.body;
   if (!title || String(title).trim().length < 2) return res.status(400).json({ error: 'Укажите заголовок объявления' });
-  if (!price || Number(price) < 0 || !String(price).trim()) return res.status(400).json({ error: 'Укажите корректную цену' });
+  const price = parsePrice(req.body.price);
+  if (price === null) return res.status(400).json({ error: 'Укажите цену числом, например 1500 или 1500.50' });
+  if (!CATEGORIES.includes(category)) return res.status(400).json({ error: 'Выберите категорию из списка' });
 
   // Проверка прав и статуса продавца — по данным БД, а не только по токену (ТЗ 5.3, 6.4)
   db.get('SELECT id, role, status, type FROM users WHERE id = ?', [jwtUser.id], async (gErr, seller) => {
@@ -241,7 +280,8 @@ router.delete('/:id', (req, res) => {
   const user = getUserFromAuthHeader(req);
   if (!user) return res.status(401).json({ error: 'Unauthorized' });
   const id = req.params.id;
-  db.get('SELECT owner_id FROM listings WHERE id = ?', [id], (err, row) => {
+ // "imagePath" в кавычках — чтобы PostgreSQL вернул ключ именно в таком регистре
+  db.get('SELECT owner_id, imagePath AS "imagePath" FROM listings WHERE id = ?', [id], (err, row) => {
     if (err) return res.status(500).json({ error: 'DB error' });
     if (!row) return res.status(404).json({ error: 'Not found' });
     if (row.owner_id !== user.id) return res.status(403).json({ error: 'Forbidden' });
@@ -269,7 +309,7 @@ router.put('/:id', async (req, res) => {
   const { title, category, price, description, imageBase64 } = req.body;
 
   // Запрашиваем и owner_id, и imagePath
-  db.get('SELECT owner_id, imagePath FROM listings WHERE id = ?', [id], async (err, row) => {
+  db.get('SELECT owner_id, imagePath AS "imagePath" FROM listings WHERE id = ?', [id], async (err, row) => {
     if (err) return res.status(500).json({ error: 'DB error' });
     if (!row) return res.status(404).json({ error: 'Not found' });
     if (row.owner_id !== user.id) return res.status(403).json({ error: 'Forbidden' });
@@ -279,8 +319,15 @@ router.put('/:id', async (req, res) => {
     let newImagePath = row.imagePath;
 
     if (title !== undefined) { updates.push('title = ?'); params.push(title); }
-    if (category !== undefined) { updates.push('category = ?'); params.push(category); }
-    if (price !== undefined) { updates.push('price = ?'); params.push(price); }
+    if (category !== undefined) {
+      if (!CATEGORIES.includes(category)) return res.status(400).json({ error: 'Выберите категорию из списка' });
+      updates.push('category = ?'); params.push(category);
+    }
+    if (price !== undefined) {
+      const cleanPrice = parsePrice(price);
+      if (cleanPrice === null) return res.status(400).json({ error: 'Укажите цену числом, например 1500' });
+      updates.push('price = ?'); params.push(cleanPrice);
+    }
     if (description !== undefined) { updates.push('description = ?'); params.push(description); }
 
     // Обработка нового изображения

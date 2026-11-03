@@ -84,7 +84,8 @@
           <div class="footer-column">
             <h4>Покупателям</h4>
             <a href="/frontend/listings.html">Каталог товаров</a>
-            <a href="/frontend/contacts.html">Служба поддержки</a>
+            <a href="/frontend/cart.html">Корзина</a>
+            <a href="/frontend/orders.html">Мои заказы</a>
           </div>
           <div class="footer-column">
             <h4>Продавцам</h4>

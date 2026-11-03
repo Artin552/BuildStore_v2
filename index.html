@@ -15,7 +15,6 @@
   <script src="/frontend/js/api.js" defer></script>
   <script src="/frontend/js/auth.js" defer></script>
   <script src="/frontend/js/cart.js" defer></script>
-  <script src="/frontend/js/search.js" defer></script>
   <script src="/frontend/js/index.js" defer></script>
 </head>
 <body>
@@ -65,13 +64,13 @@
         </div>
         <div class="stat-card">
           <span class="stat-icon icon-inline"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.62l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/></svg></span>
-          <span class="stat-value">По всей России</span>
-          <span class="stat-label">Доставка</span>
+          <span class="stat-value">Доставка</span>
+          <span class="stat-label">по всей России</span>
         </div>
         <div class="stat-card">
           <span class="stat-icon icon-inline"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="14" x="2" y="7" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg></span>
-          <span class="stat-value">B2B &amp; B2C</span>
-          <span class="stat-label">Форматы</span>
+          <span class="stat-value">B2B и B2C</span>
+          <span class="stat-label">для компаний и частных лиц</span>
         </div>
       </div>
       
@@ -79,11 +78,12 @@
       <form class="hero-search" action="/frontend/listings.html" method="GET" role="search">
         <label for="heroCategory" class="visually-hidden">Категория</label>
         <select id="heroCategory" name="category">
-          <option value="">Все категории</option>
+           <option value="">Все категории</option>
+          <!-- Список должен совпадать с CATEGORIES в backend/routes/listings.js и с add.html -->
           <option>Материалы</option>
           <option>Инструменты</option>
-          <option>Техника</option>
-          <option>Крепёж</option>
+          <option>Электроинструмент</option>
+          <option>СИЗ</option>
         </select>
         
         <label for="heroSearch" class="visually-hidden">Поиск</label>
@@ -113,9 +113,12 @@
     <!-- КАТЕГОРИИ (BENTO-сетка) -->
     <section class="categories-section" aria-label="Категории товаров">
       <h2>Популярные категории</h2>
-      <div class="categories-grid" id="categoriesGrid">
-        <!-- Карточки категорий будут добавлены через JS -->
-      </div>
+      <div class="categories-grid" id="categoriesGrid" aria-live="polite">
+        <!-- Пока index.js загружает данные, видно это сообщение, а не пустой прямоугольник -->
+        <div class="empty-state">
+          <div class="empty-state-title">Загружаем категории…</div>
+        </div>
+      </div>  
     </section>
 
     <!-- КАК ЭТО РАБОТАЕТ (статичные шаги) -->
@@ -185,7 +188,8 @@
         <div class="footer-column">
           <h4>Покупателям</h4>
           <a href="/frontend/listings.html">Каталог товаров</a>
-          <a href="/frontend/contacts.html">Как сделать заказ и доставка</a>
+          <a href="/frontend/cart.html">Корзина</a>
+          <a href="/frontend/orders.html">Мои заказы</a>
         </div>
 
         <div class="footer-column">
@@ -198,7 +202,7 @@
           <h4>Контакты</h4>
           <!-- Проект учебный/демонстрационный: честная подпись, без выдуманных email/телефона компании (ТЗ 2A.5, 2A.6) -->
           <a href="/frontend/contacts.html">Автор проекта</a>
-          <a href="https://t.me/Artin552" target="_blank" rel="noopener">Telegram автора</a>
+          <a href="https://t.me/Artin552" target="_blank" rel="noopener">Написать в Telegram</a>
         </div>
       </div>
 

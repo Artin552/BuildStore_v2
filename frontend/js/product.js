@@ -1,102 +1,103 @@
-  // Экранирование HTML — названия/описания объявлений вводят пользователи,
-  // без этого возможен stored XSS через innerHTML
-  function esc(s) {
-    return String(s == null ? '' : s)
-      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+// ============================================================
+// СТРАНИЦА ТОВАРА (product.js) — для product.html
+// ============================================================
+// Что изменилось по сравнению со старой версией:
+// 1. Показываем тип продавца и сертификат (ТЗ 7.1, 7.2): «Частный продавец»,
+//    «Организация «…»», ссылка на сертификат или заметное предупреждение.
+// 2. Убраны обработчики #searchBtn/#searchInput — таких элементов на странице
+//    нет, и скрипт падал с ошибкой «Cannot read properties of null».
+// 3. Убран onclick="alert(...)" у кнопки «Связаться» — его блокирует CSP.
+// 4. Картинки с picsum.photos блокирует CSP — используем свою заглушку.
+(function () {
+  'use strict';
+
+  const api = window.BuildStoreApi;
+  const esc = api.escapeHtml;
+  const root = document.getElementById('productDetail');
+
+  const productId = new URLSearchParams(window.location.search).get('id');
+
+  function showError(text) {
+    root.innerHTML = `
+      <div class="empty-state">
+        <div class="empty-state-title">${esc(text)}</div>
+        <a href="/frontend/listings.html" class="btn btn-primary" style="margin-top:16px;">Вернуться в каталог</a>
+      </div>`;
   }
 
-  // Получить id товара из URL
-    const params = new URLSearchParams(window.location.search);
-    const productId = params.get('id');
-
-    if (!productId) {
-      document.getElementById('productDetail').innerHTML = '<p>Товар не найден</p>';
-    } else {
-      // Загрузить товар
-      fetch('/api/listings/' + encodeURIComponent(productId))
-        .then(res => {
-          if (!res.ok) throw new Error('Товар не найден');
-          return res.json();
-        })
-        .then(item => {
-          const imgUrl = item.imagePath || `https://picsum.photos/seed/${encodeURIComponent(item.title)}/1200/700`;
-          const created = item.created_at ? new Date(Number(item.created_at)) : null;
-          const dateStr = created ? created.toLocaleDateString('ru-RU', { year:'numeric', month:'long', day:'numeric' }) : '';
-
-          const html = `
-            <div class="listing-detail" style="max-width:800px; margin:0 auto;">
-              <div class="listing-header">
-                <div class="listing-title" style="font-size:28px; font-weight:bold; margin-bottom:8px;">${esc(item.title)}</div>
-                <div class="listing-date muted small">${dateStr}</div>
-              </div>
-
-              <div class="listing-image-wrapper" style="margin:24px 0;">
-                <img class="listing-image" src="${imgUrl}" alt="${esc(item.title)}" style="max-width:100%; border-radius:8px;">
-              </div>
-
-              <div class="listing-body" style="margin:24px 0;">
-                <div class="listing-desc" style="font-size:16px; line-height:1.6; margin-bottom:16px;">${esc(item.description)}</div>
-                <div class="listing-meta muted small">
-                  <strong>Категория:</strong> ${esc(item.category || 'Не указана')}
-                </div>
-              </div>
-
-              <div class="listing-info" style="margin:24px 0; padding:16px; background:#f5f5f5; border-radius:8px;">
-                <div style="margin-bottom:12px;"><strong>Цена:</strong> ${item.price ? (item.price + ' ₽') : 'По договорённости'}</div>
-                <div style="margin-bottom:12px;"><strong>Статус:</strong> ${item.in_stock ? '✅ В наличии' : '❌ Нет в наличии'}</div>
-                ${item.rating ? `<div style="margin-bottom:12px;"><strong>Рейтинг:</strong> ⭐ ${item.rating}</div>` : ''}
-              </div>
-
-              <div class="listing-cta" style="margin:24px 0; padding:24px; background:#f0f8ff; border-radius:8px;">
-                <h3 style="margin-top:0;">Готовы купить?</h3>
-                <p class="muted">Добавьте товар в корзину и оформите заказ онлайн.</p>
-                <div style="margin-top:16px; display:flex; gap:12px;">
-                  <button class="btn" id="addToCartBtn" style="flex:1;">Добавить в корзину</button>
-                  <button class="btn secondary" onclick="alert('Функция контактов будет добавлена')" style="flex:1;">Связаться</button>
-                </div>
-              </div>
-
-              <div style="text-align:center; margin:32px 0;">
-                <a href="/frontend/listings.html" class="btn secondary">← Вернуться к категориям</a>
-              </div>
-            </div>
-          `;
-
-          document.getElementById('productDetail').innerHTML = html;
-
-          // Обработчик для кнопки "Добавить в корзину"
-          const addToCartBtn = document.getElementById('addToCartBtn');
-          if (addToCartBtn) {
-            addToCartBtn.addEventListener('click', () => {
-              window.cart.addItem(item);
-              addToCartBtn.textContent = '✓ Добавлено в корзину';
-              addToCartBtn.disabled = true;
-              setTimeout(() => {
-                addToCartBtn.textContent = 'Добавить в корзину';
-                addToCartBtn.disabled = false;
-              }, 2000);
-            });
-          }
-        })
-        .catch(err => {
-          document.getElementById('productDetail').innerHTML = `<p style="color:red;">Ошибка: ${esc(err.message)}</p><a href="/frontend/listings.html" class="btn">Вернуться</a>`;
-        });
+  // Блок про документы: для организации — сертификат или предупреждение
+  function certificateBlock(item) {
+    if (item.sellerType !== 'organization') return '';
+    if (item.certificatePath) {
+      return `
+        <div class="notice notice-success">
+          <strong>Продавец приложил сертификат / паспорт товара.</strong>
+          <a href="${esc(item.certificatePath)}" target="_blank" rel="noopener">Открыть документ</a>
+        </div>`;
     }
+    return `
+      <div class="notice notice-warning" role="note">
+        <strong>Внимание: продавец не предоставил сертификат или паспорт на этот товар.</strong>
+        Перед покупкой запросите документы у продавца.
+      </div>`;
+  }
 
-    // Поиск
-    document.getElementById('searchBtn').addEventListener('click', () => {
-      const q = document.getElementById('searchInput').value.trim();
-      if (q) {
-        window.location.href = '/frontend/listings.html?q=' + encodeURIComponent(q);
-      }
-    });
+  function render(item) {
+    const created = item.created_at ? new Date(Number(item.created_at)) : null;
+    const dateStr = created ? created.toLocaleDateString('ru-RU', { year: 'numeric', month: 'long', day: 'numeric' }) : '';
+    document.title = (item.title || 'Объявление') + ' — BuildStore';
 
-    document.getElementById('searchInput').addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        const q = document.getElementById('searchInput').value.trim();
-        if (q) {
-          window.location.href = '/frontend/listings.html?q=' + encodeURIComponent(q);
-        }
-      }
+    root.innerHTML = `
+      <article class="product-detail">
+        <div class="product-media">
+          <img class="product-image" src="${esc(item.imagePath || '/img/placeholder.svg')}" alt="${esc(item.title)}">
+        </div>
+
+        <div class="product-info">
+          <h1 class="product-title">${esc(item.title)}</h1>
+          <div class="text-muted">${esc(item.category || 'Без категории')}${dateStr ? ' · размещено ' + dateStr : ''}</div>
+
+          <div class="product-price">${api.formatPrice(item.price)}</div>
+          <div class="card-meta">
+            ${item.in_stock ? '<span class="badge badge-stock">В наличии</span>' : '<span class="badge badge-out-of-stock">Нет в наличии</span>'}
+          </div>
+
+          <!-- Пометка продавца (ТЗ 7.1) и документы (ТЗ 7.2) -->
+          ${api.sellerBadgesHtml(item)}
+          ${certificateBlock(item)}
+
+          <p class="product-description">${esc(item.description || 'Описание не указано')}</p>
+
+          <div class="product-actions">
+            <button type="button" class="btn btn-primary" id="addToCartBtn">Добавить в корзину</button>
+            <a href="/frontend/listings.html" class="btn btn-secondary">Назад в каталог</a>
+          </div>
+          <p class="form-message" id="cartMessage" role="status" hidden></p>
+        </div>
+      </article>`;
+
+    root.querySelector('.product-image').addEventListener('error', (e) => {
+      e.target.src = '/img/placeholder.svg';
+    }, { once: true });
+
+    const button = document.getElementById('addToCartBtn');
+    const message = document.getElementById('cartMessage');
+    button.addEventListener('click', () => {
+      window.cart.addItem(item);
+      message.innerHTML = 'Товар добавлен. <a href="/frontend/cart.html">Перейти в корзину</a>';
+      message.hidden = false;
     });
+  }
+
+  async function load() {
+    if (!productId) return showError('Товар не найден');
+    try {
+      const res = await api.apiFetch('/listings/' + encodeURIComponent(productId), { headers: api.authHeaders() });
+      render(await res.json());
+    } catch (err) {
+      showError(err.status === 404 ? 'Товар не найден или снят с публикации' : err.message);
+    }
+  }
+
+  load();
+})();

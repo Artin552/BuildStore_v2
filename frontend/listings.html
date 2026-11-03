@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Категории товаров — BuildStore</title>
+  <title>Каталог — BuildStore</title>
   <link rel="stylesheet" href="/frontend/css/styles.css">
   <script src="/frontend/js/theme.js" defer></script>
   <script src="/frontend/js/api.js" defer></script>
@@ -12,181 +12,55 @@
   <script src="/frontend/js/cart.js" defer></script>
   <script src="/frontend/js/listings.js" defer></script>
 </head>
-
 <body>
+  <header id="site-header"></header>
 
-  <!-- ========================================
-       ШАПКА САЙТА
-       ======================================== -->
-<header id="site-header"></header>
+  <main class="container page-main">
 
-  <!-- ========================================
-       ОСНОВНОЙ КОНТЕНТ
-       ======================================== -->
-  <main class="container" style="padding: 20px 0 40px 0;">
-
-    <!-- РАЗДЕЛ: Категории товаров -->
-    <section id="categoriesSection" aria-label="Категории товаров">
-      <h2 style="
-        font-size: 28px;
-        font-weight: 700;
-        margin: 0 0 24px 0;
-        color: var(--primary);
-      ">
-        Категории товаров
-      </h2>
-
-      <!-- Сетка с карточками категорий -->
-      <div id="categoryGrid" style="
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-        gap: 24px;
-        width: 100%;
-        max-width: 1400px;
-        margin: 0 auto;
-      ">
-        <!-- Карточки будут добавлены сюда через JavaScript -->
+    <!-- Экран 1: плитки категорий -->
+    <section id="categoriesSection" aria-labelledby="catalogTitle">
+      <h1 id="catalogTitle" class="page-title">Каталог</h1>
+      <div id="categoryGrid" class="category-grid" aria-live="polite">
+        <div class="empty-state"><div class="empty-state-title">Загружаем каталог…</div></div>
       </div>
     </section>
 
-    <!-- РАЗДЕЛ: Товары категории (скрыт по умолчанию) -->
-    <section id="productsSection" style="display: none;">
-      
-      <!-- Кнопка для возврата к категориям -->
-      <button id="backBtn" class="btn secondary" style="
-        margin-bottom: 20px;
-        display: inline-block;
-      ">
-        ← Вернуться к категориям
-      </button>
+    <!-- Экран 2: товары категории или результаты поиска -->
+    <section id="productsSection" hidden>
+      <button type="button" id="backBtn" class="btn btn-secondary btn-sm">Все категории</button>
+      <h1 id="categoryTitle" class="page-title"></h1>
 
-      <!-- Название выбранной категории -->
-      <h2 id="categoryTitle" style="
-        font-size: 24px;
-        font-weight: 700;
-        margin: 0 0 20px 0;
-        color: var(--primary);
-      "></h2>
+      <div class="catalog-layout">
+        <aside id="filtersPanel" class="filters-panel" aria-label="Фильтры">
+          <h2 class="filters-title">Фильтры</h2>
 
-      <!-- Панель фильтров -->
-      <aside id="filtersPanel" style="
-        background: var(--card);
-        padding: 16px;
-        border-radius: 8px;
-        margin-bottom: 20px;
-        box-shadow: var(--shadow);
-      ">
-        <h3 style="
-          margin: 0 0 12px 0;
-          font-size: 16px;
-          font-weight: 700;
-          color: var(--primary);
-        ">
-          Фильтры
-        </h3>
+          <label class="checkbox-row"><input type="checkbox" id="fInStock"> <span>В наличии</span></label>
+          <label class="checkbox-row"><input type="checkbox" id="fDiscount"> <span>Только со скидкой</span></label>
 
-        <!-- Фильтр: В наличии -->
-        <div style="margin-bottom: 12px;">
-          <label style="
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            cursor: pointer;
-          ">
-            <input type="checkbox" id="fInStock">
-            <span>В наличии</span>
-          </label>
-        </div>
-
-        <!-- Фильтр: Со скидкой -->
-        <div style="margin-bottom: 12px;">
-          <label style="
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            cursor: pointer;
-          ">
-            <input type="checkbox" id="fDiscount">
-            <span>Только со скидкой</span>
-          </label>
-        </div>
-
-        <!-- Фильтр: Рейтинг -->
-        <div style="margin-bottom: 12px;">
-          <label style="
-            display: block;
-            margin-bottom: 6px;
-            font-weight: 600;
-            cursor: pointer;
-          ">
-            Минимальный рейтинг
-          </label>
-          <select id="fRating" style="
-            width: 100%;
-            padding: 6px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-          ">
+          <label class="filter-label" for="fRating">Минимальный рейтинг</label>
+          <select id="fRating" class="input">
             <option value="0">Любой</option>
-            <option value="3">≥ 3 звезды</option>
-            <option value="4">≥ 4 звезды</option>
+            <option value="3">от 3 звёзд</option>
+            <option value="4">от 4 звёзд</option>
           </select>
+
+          <label class="filter-label" for="fMaxPrice">Цена до, ₽</label>
+          <input type="number" id="fMaxPrice" class="input" min="0" placeholder="Например, 5000">
+
+          <div class="filters-actions">
+            <button type="button" id="clearFiltersBtn" class="btn btn-secondary btn-sm">Сбросить</button>
+            <button type="button" id="applyFiltersBtn" class="btn btn-primary btn-sm">Применить</button>
+          </div>
+        </aside>
+
+        <div>
+          <div id="productsGrid" class="listings-grid" aria-live="polite"></div>
+          <div id="paginationContainer" class="pagination"></div>
         </div>
-
-        <!-- Фильтр: Максимальная цена -->
-        <div style="margin-bottom: 12px;">
-          <label style="
-            display: block;
-            margin-bottom: 6px;
-            font-weight: 600;
-            cursor: pointer;
-          ">
-            Цена (максимум)
-          </label>
-          <input type="number" id="fMaxPrice" placeholder="Введите сумму" style="
-            width: 100%;
-            padding: 6px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-          ">
-        </div>
-
-        <!-- Кнопки фильтров -->
-        <div style="
-          display: flex;
-          gap: 8px;
-          margin-top: 16px;
-        ">
-          <button id="clearFiltersBtn" class="btn" style="flex: 1;">
-            Сбросить
-          </button>
-          <button id="applyFiltersBtn" class="btn primary" style="flex: 1;">
-            Применить
-          </button>
-        </div>
-      </aside>
-
-      <!-- Сетка товаров -->
-      <div id="productsGrid" class="grid" style="margin-top: 20px;">
-        <!-- Товары будут добавлены сюда -->
-      </div>
-
-      <!-- Пагинация -->
-      <div id="paginationContainer" style="
-        text-align: center;
-        margin-top: 20px;
-      ">
-        <!-- Кнопки пагинации будут добавлены сюда -->
       </div>
     </section>
-
   </main>
 
   <footer id="site-footer"></footer>
-
-
-
 </body>
 </html>
-
-

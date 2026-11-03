@@ -1,7 +1,18 @@
 // backend/db.js
 // PostgreSQL версия
-const { Pool } = require('pg');
-require('dotenv').config();
+const path = require('path');
+const { Pool, types } = require('pg');
+// .env ищем рядом с этим файлом (в папке backend), а не там, откуда запущен node
+require('dotenv').config({ path: path.join(__dirname, '.env') });
+
+// BIGINT (created_at, COUNT(*)) pg по умолчанию отдаёт строкой — превращаем в число,
+// иначе new Date("1790...") на фронтенде даёт «Invalid Date»
+types.setTypeParser(20, (value) => (value === null ? null : Number(value)));
+
+// Без пароля в .env не стартуем — лучше понятная ошибка, чем «угадывание» пароля
+if (!process.env.PGPASSWORD) {
+  console.error('❌ В backend/.env не задан PGPASSWORD — сервер не сможет подключиться к базе');
+}
 
 // Подключение к PostgreSQL
 const pool = new Pool({
@@ -9,7 +20,7 @@ const pool = new Pool({
   port: process.env.PGPORT || 5432,
   database: process.env.PGDATABASE || 'buildstorenet',
   user: process.env.PGUSER || 'postgres',
-  password: process.env.PGPASSWORD || 'postgres',
+  password: process.env.PGPASSWORD,
   max: 20, // максимальное количество клиентов в пуле
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 2000,
@@ -148,8 +159,9 @@ async function initDatabase() {
   }
 }
 
-// Запускаем инициализацию
-initDatabase().catch(console.error);
+// Запускаем инициализацию. Сохраняем «обещание», чтобы server.js
+// мог дождаться готовности базы ПЕРЕД тем, как принимать запросы
+const dbReady = initDatabase();
 
 // ============================================================
 // АВТОМАТИЧЕСКАЯ КОНВЕРТАЦИЯ ЗАПРОСОВ ИЗ СИНТАКСИСА sqlite3 В PostgreSQL
@@ -192,15 +204,16 @@ function pgToSqlite(sql) {
     out += ch;
     i++;
   }
-  // Диалектные правки вне литералов
+ // ILIKE НЕ трогаем: в PostgreSQL это и есть поиск без учёта регистра
+  // (раньше он заменялся на LIKE, и «кирпич» не находил «Кирпич»)
   return out
-    .replace(/\bILIKE\b/gi, 'LIKE')
     .replace(/CAST\(([^()]*)AS\s+REAL\)/gi, 'CAST($1 AS DOUBLE PRECISION)');
 }
 
 // Экспорт пула и вспомогательных функций
 module.exports = {
   pool,
+  dbReady,
   pgToSqlite,
   
   // Обёртки для совместимости со старым API sqlite3

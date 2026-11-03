@@ -9,47 +9,57 @@
   <script src="/frontend/js/api.js" defer></script>
   <script src="/frontend/js/layout.js" defer></script>
   <script src="/frontend/js/auth.js" defer></script>
+  <script src="/frontend/js/cart.js" defer></script>
   <script src="/frontend/js/add.js" defer></script>
 </head>
 <body>
   <header id="site-header"></header>
 
-  <main class="container" style="padding-top:40px; max-width:760px;">
-    <h2>Добавить объявление</h2>
-    <form id="addForm" class="form">
-      <!-- title -->
-      <input class="input" id="title" placeholder="Заголовок (напр. 'Экскаватор JCB 2012')" required>
-      <!-- category -->
-      <select id="category" class="input">
-        <option>Техника</option>
-        <option>Инструменты</option>
-        <option>Материалы</option>
-        <option>Крепеж</option>
-      </select>
-      <!-- price -->
-      <input class="input" id="price" placeholder="Цена в ₽ (или оставьте пустым)" type="number" min="0">
-      <!-- description -->
-      <textarea id="description" class="input" placeholder="Описание объявления"></textarea>
+  <main class="container page-main" style="max-width:760px;">
+    <h1 class="page-title">Добавить объявление</h1>
 
-      <!-- upload image (будем читать в base64 и отправлять в JSON) -->
-      <label>Фото (1):</label>
-      <input id="photo" type="file" accept="image/*">
+    <!-- Сюда add.js пишет «организация на проверке» и т.п. -->
+    <div id="sellerNotice" class="notice notice-warning" role="status" hidden></div>
+
+    <form id="addForm" class="form" novalidate>
+      <label class="filter-label" for="title">Заголовок<span class="required">*</span></label>
+      <input class="input" id="title" placeholder="Например: Перфоратор Makita HR2470" maxlength="120" required>
+
+      <label class="filter-label" for="category">Категория<span class="required">*</span></label>
+      <select id="category" class="input" required>
+        <!-- Список должен совпадать с CATEGORIES в backend/routes/listings.js и с index.html -->
+        <option value="">Выберите категорию</option>
+        <option>Материалы</option>
+        <option>Инструменты</option>
+        <option>Электроинструмент</option>
+        <option>СИЗ</option>
+        <option>Техника</option>
+        <option>Крепёж</option>
+      </select>
+
+      <label class="filter-label" for="price">Цена, ₽<span class="required">*</span></label>
+      <input class="input" id="price" placeholder="Например: 8900" type="number" min="0" step="0.01" inputmode="decimal" required>
+
+      <label class="filter-label" for="description">Описание</label>
+      <textarea id="description" class="input" placeholder="Состояние, характеристики, условия доставки"></textarea>
+
+      <label class="filter-label" for="photo">Фото товара</label>
+      <input id="photo" type="file" accept="image/jpeg,image/png,image/webp">
 
       <!-- Паспорт/сертификат товара (ТЗ 7.2): обязателен для организаций в отдельных категориях -->
-      <label for="certificate">Паспорт / сертификат товара <span id="certRequiredMark" hidden style="color:#c92a2a;">*</span></label>
-      <p class="text-muted" style="font-size:13px; margin:4px 0;">PDF, JPG или PNG, до 10 МБ. Для верифицированных организаций в категориях «Электроинструмент» и «СИЗ» — обязателен.</p>
+      <label class="filter-label" for="certificate">Паспорт / сертификат товара <span id="certRequiredMark" class="required" hidden>* обязателен</span></label>
+      <p class="text-muted field-hint">PDF, JPG или PNG, до 10 МБ. Для организаций в категориях «Электроинструмент» и «СИЗ» — обязателен. Без него в карточке будет пометка «Нет сертификата».</p>
       <input id="certificate" type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png">
-      <div class="field-error" data-error-for="certificate"></div>
 
-      <div style="display:flex; gap:8px; justify-content:flex-end;">
-        <button class="btn" type="submit">Опубликовать</button>
-  <a href="/index.html" class="btn secondary">Отмена</a>
+      <div class="form-error" id="addError" role="alert" hidden></div>
+
+      <div class="form-actions">
+        <a href="/index.html" class="btn btn-secondary">Отмена</a>
+        <button class="btn btn-primary" type="submit" id="submitBtn">Опубликовать</button>
       </div>
     </form>
   </main>
 
   <footer id="site-footer"></footer>
-
-
 </body>
 </html>
