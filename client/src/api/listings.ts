@@ -1,9 +1,10 @@
-// Запросы объявлений (GET). Создание и редактирование появятся на шаге 3.
-import { apiFetch, apiFetchList } from './client';
+// Запросы объявлений.
+import { UPLOAD_TIMEOUT_MS, apiFetch, apiFetchList } from './client';
 import { CATEGORIES } from './types';
-import type { Category, Listing } from './types';
+import type { Category, Listing, ListingInput } from './types';
 
 export interface ListingFilters {
+  mine?: boolean; // только свои объявления, включая снятые модератором
   q?: string;
   category?: string;
   inStock?: boolean;
@@ -16,6 +17,7 @@ export interface ListingFilters {
 
 export function fetchListings(filters: ListingFilters, signal?: AbortSignal) {
   const params = new URLSearchParams();
+  if (filters.mine) params.set('mine', 'true');
   if (filters.q) params.set('q', filters.q);
   if (filters.category) params.set('category', filters.category);
   if (filters.inStock) params.set('in_stock', 'true');
@@ -30,6 +32,18 @@ export function fetchListings(filters: ListingFilters, signal?: AbortSignal) {
 
 export function fetchListing(id: string, signal?: AbortSignal): Promise<Listing> {
   return apiFetch<Listing>(`/listings/${encodeURIComponent(id)}`, { signal });
+}
+
+export function createListing(data: ListingInput): Promise<Listing> {
+  return apiFetch<Listing>('/listings', { method: 'POST', body: data, timeoutMs: UPLOAD_TIMEOUT_MS });
+}
+
+export function updateListing(id: number, data: ListingInput): Promise<Listing> {
+  return apiFetch<Listing>(`/listings/${id}`, { method: 'PUT', body: data, timeoutMs: UPLOAD_TIMEOUT_MS });
+}
+
+export function deleteListing(id: number): Promise<{ success: boolean }> {
+  return apiFetch(`/listings/${id}`, { method: 'DELETE' });
 }
 
 export interface CategorySummary {

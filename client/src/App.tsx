@@ -1,14 +1,22 @@
 // Таблица маршрутов: какой адрес какую страницу показывает (docs/REACT_MIGRATION.md, раздел 3).
 import { Route, Routes } from 'react-router-dom';
+import GuestRoute from './components/GuestRoute';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
+import AccountPage from './pages/AccountPage';
 import CartPage from './pages/CartPage';
 import CatalogPage from './pages/CatalogPage';
+import ForgotPage from './pages/ForgotPage';
 import HomePage from './pages/HomePage';
+import ListingFormPage from './pages/ListingFormPage';
+import LoginPage from './pages/LoginPage';
+import MyListingsPage from './pages/MyListingsPage';
 import NotFoundPage from './pages/NotFoundPage';
 import OrdersPage from './pages/OrdersPage';
 import PlaceholderPage from './pages/PlaceholderPage';
 import ProductPage from './pages/ProductPage';
+import RegisterPage from './pages/RegisterPage';
+import ResetPage from './pages/ResetPage';
 
 export default function App() {
   return (
@@ -24,16 +32,19 @@ export default function App() {
         {/* Только для вошедших */}
         <Route element={<ProtectedRoute />}>
           <Route path="/orders" element={<OrdersPage />} />
+          <Route path="/account" element={<AccountPage />} />
+          <Route path="/my-listings" element={<MyListingsPage />} />
+          <Route path="/listings/new" element={<ListingFormPage />} />
+          <Route path="/listings/:id/edit" element={<ListingFormPage />} />
         </Route>
 
-        <Route path="/login" element={<PlaceholderPage title="Вход" />} />
-        <Route path="/register" element={<PlaceholderPage title="Регистрация" />} />
-        <Route path="/forgot" element={<PlaceholderPage title="Восстановление пароля" />} />
-        <Route path="/reset" element={<PlaceholderPage title="Новый пароль" />} />
-        <Route path="/account" element={<PlaceholderPage title="Личный кабинет" />} />
-        <Route path="/my-listings" element={<PlaceholderPage title="Мои объявления" />} />
-        <Route path="/listings/new" element={<PlaceholderPage title="Новое объявление" />} />
-        <Route path="/listings/:id/edit" element={<PlaceholderPage title="Редактирование объявления" />} />
+        {/* Только для гостей */}
+        <Route element={<GuestRoute />}>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/forgot" element={<ForgotPage />} />
+          <Route path="/reset" element={<ResetPage />} />
+        </Route>
 
         <Route path="/contacts" element={<PlaceholderPage title="Контакты" />} />
         <Route path="/privacy" element={<PlaceholderPage title="Политика конфиденциальности" />} />

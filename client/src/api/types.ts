@@ -60,9 +60,22 @@ export interface OrganizationRegistration {
   documents: string[]; // dataURL PDF/JPG/PNG
 }
 
+export interface RegisterRequest {
+  name: string;
+  email: string;
+  password: string;
+  type: AccountType;
+  consent?: boolean;
+  organization?: OrganizationRegistration;
+}
+
 // ---------- Объявления ----------
 export const CATEGORIES = ['Материалы', 'Инструменты', 'Электроинструмент', 'СИЗ', 'Техника', 'Крепёж'] as const;
 export type Category = (typeof CATEGORIES)[number];
+
+// Для организаций в этих категориях сертификат обязателен. Должно совпадать с
+// CERT_REQUIRED_CATEGORIES в backend/routes/listings.js
+export const CERT_REQUIRED_CATEGORIES: readonly string[] = ['Электроинструмент', 'СИЗ'];
 
 export type ModerationStatus = 'published' | 'removed';
 
@@ -87,6 +100,16 @@ export interface Listing {
   sellerType: AccountType;
   sellerVerified: boolean;
   sellerOrgName: string | null;
+}
+
+// Тело POST /listings и PUT /listings/:id. Сертификат через PUT сервер не меняет.
+export interface ListingInput {
+  title: string;
+  category: string;
+  price: string;
+  description: string;
+  imageBase64?: string;
+  certificateBase64?: string;
 }
 
 // ---------- Корзина (хранится в браузере, localStorage) ----------

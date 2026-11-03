@@ -228,7 +228,7 @@ async function createListing(req, res, seller, title, category, price, descripti
       finalImagePath = filename;
     } catch (err) {
       console.error('Failed to save image', err);
-      return res.status(400).json({ error: 'Invalid image upload' });
+      return res.status(400).json({ error: 'Не удалось загрузить фото. Допустимы JPG, PNG или WEBP размером до 5 МБ.' });
     }
   }
 
@@ -285,16 +285,23 @@ router.delete('/:id', (req, res) => {
     if (err) return res.status(500).json({ error: 'DB error' });
     if (!row) return res.status(404).json({ error: 'Not found' });
     if (row.owner_id !== user.id) return res.status(403).json({ error: 'Forbidden' });
-    // 🔥 Удаляем файл при удалении объявления
-    if (row.imagePath) {
-      const uploadDir = path.join(__dirname, '..', '..', 'uploads');
-      const filePath = path.join(uploadDir, row.imagePath);
-      fs.unlink(filePath, (unlinkErr) => {
-        if (unlinkErr) console.warn('Не удалось удалить файл при удалении объявления:', unlinkErr.message);
-      });
-    }
     db.run('DELETE FROM listings WHERE id = ?', [id], function (err2) {
-      if (err2) return res.status(500).json({ error: 'DB error' });
+      if (err2) {
+        // 23503 — на объявление ссылаются заказы (order_items.listing_id)
+        if (err2.code === '23503') {
+          return res.status(409).json({ error: 'Это объявление уже покупали, поэтому удалить его нельзя: оно нужно для истории заказов.' });
+        }
+        return res.status(500).json({ error: 'Не удалось удалить объявление, попробуйте позже' });
+      }
+      // Файл удаляем только ПОСЛЕ записи в базе: раньше при отказе базы фото пропадало,
+      // а объявление оставалось
+      if (row.imagePath) {
+        const uploadDir = path.join(__dirname, '..', '..', 'uploads');
+        const filePath = path.join(uploadDir, row.imagePath);
+        fs.unlink(filePath, (unlinkErr) => {
+          if (unlinkErr) console.warn('Не удалось удалить файл при удалении объявления:', unlinkErr.message);
+        });
+      }
       res.json({ success: true });
     });
   });
@@ -365,7 +372,7 @@ router.put('/:id', async (req, res) => {
         params.push(newImagePath);
       } catch (e) {
         console.error('Ошибка загрузки изображения:', e);
-        return res.status(400).json({ error: 'Invalid image upload' });
+        return res.status(400).json({ error: 'Не удалось загрузить фото. Допустимы JPG, PNG или WEBP размером до 5 МБ.' });
       }
     }
 

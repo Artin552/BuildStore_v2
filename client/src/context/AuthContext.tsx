@@ -1,9 +1,9 @@
 // Кто сейчас вошёл на сайт. Это только для показа: права всё равно проверяет сервер.
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
-import { fetchMe, loginRequest } from '../api/auth';
+import { fetchMe, loginRequest, registerRequest } from '../api/auth';
 import { ApiError, UNAUTHORIZED_EVENT, clearToken, getToken, isAbortError, saveToken } from '../api/client';
-import type { Me } from '../api/types';
+import type { Me, RegisterRequest } from '../api/types';
 
 // loading     — токен есть, ждём ответ сервера
 // authenticated — вошёл, данные в user
@@ -15,6 +15,7 @@ interface AuthContextValue {
   user: Me | null;
   status: AuthStatus;
   login: (email: string, password: string, remember?: boolean) => Promise<void>;
+  register: (data: RegisterRequest) => Promise<void>;
   logout: () => void;
   refresh: () => Promise<void>;
 }
@@ -78,9 +79,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [loadUser],
   );
 
+  const register = useCallback(
+    async (data: RegisterRequest) => {
+      const { token } = await registerRequest(data);
+      saveToken(token, false);
+      setStatus('loading');
+      await loadUser();
+    },
+    [loadUser],
+  );
+
+  // refresh вызывают из кнопок и обработчиков, поэтому прячем необязательный аргумент signal
+  const refresh = useCallback(() => loadUser(), [loadUser]);
+
   const value = useMemo<AuthContextValue>(
-    () => ({ user, status, login, logout, refresh: loadUser }),
-    [user, status, login, logout, loadUser],
+    () => ({ user, status, login, register, logout, refresh }),
+    [user, status, login, register, logout, refresh],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

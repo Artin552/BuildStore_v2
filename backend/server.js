@@ -71,10 +71,6 @@ if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
   console.warn('⚠️  JWT_SECRET не задан или короче 32 символов — для продакшена задайте его в .env!');
 }
 
-// Ограничиваем размер JSON тела запроса до 2MB (защита от DoS атак)
-app.use(express.json({ limit: process.env.JSON_LIMIT || '2mb' }));
-app.use(express.urlencoded({ extended: true, limit: process.env.JSON_LIMIT || '2mb' }));
-
 // ============================================================
 // RATE LIMITERS (ограничение частоты запросов)
 // ============================================================
@@ -104,6 +100,32 @@ const resetLimiter = rateLimit({
   message: { error: 'Too many reset attempts, please request a new code later' }
 });
 app.use('/api/auth/reset', resetLimiter);
+
+// ============================================================
+// РАЗБОР ТЕЛА ЗАПРОСА И ЛИМИТЫ РАЗМЕРА
+// ============================================================
+// Стоит ПОСЛЕ ограничителей частоты: иначе сервер читал бы большой запрос в память
+// ещё до проверки, не превышен ли лимит запросов.
+// Файлы приходят в base64 внутри JSON, а base64 на треть больше самого файла.
+
+// Объявление: фото до 5 МБ и сертификат до 10 МБ — около 20 МБ в base64.
+// Большой запрос читаем только у вошедшего: токен проверяем до разбора тела.
+app.use('/api/listings', (req, res, next) => {
+  if (req.method !== 'POST' && req.method !== 'PUT') return next();
+  if (!authRoutes.getUserFromAuthHeader(req)) return res.status(401).json({ error: 'Требуется вход' });
+  next();
+}, express.json({ limit: '21mb' }));
+
+// Аватар до 2 МБ
+app.use('/api/auth/avatar', express.json({ limit: '3mb' }));
+
+// Регистрация организации: документы в сумме до 22 МБ. Адрес открыт всем,
+// поэтому лимит не больше необходимого, а частоту ограничивает authLimiter выше.
+app.use('/api/auth/register', express.json({ limit: '30mb' }));
+
+// Для всего остального — 2 МБ (защита от DoS атак). Уже разобранное тело этот обработчик пропускает.
+app.use(express.json({ limit: process.env.JSON_LIMIT || '2mb' }));
+app.use(express.urlencoded({ extended: true, limit: process.env.JSON_LIMIT || '2mb' }));
 
 // ============================================================
 // ЛОГИРОВАНИЕ ЗАПРОСОВ

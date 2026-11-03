@@ -118,6 +118,29 @@
 .order-item-row { display: flex; justify-content: space-between; gap: 12px; padding: 8px 0; font-size: 14px; }
 .order-item-name { flex: 1; }
 
+/* Вход и регистрация */
+.auth-title { font-size: 28px; margin-bottom: 12px; }
+.auth-container .notice a { margin-left: 0; }
+.auth-links-row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; margin: 0; }
+.auth-container > .btn { width: 100%; }
+.org-fields .form-row { align-items: start; }
+.field-hint { margin-bottom: 6px; }
+
+/* Кабинет */
+.account-page { max-width: 560px; }
+.profile-card { max-width: none; margin-top: 12px; }
+.profile-head p { margin: 4px 0; }
+.avatar-upload { position: relative; }
+.profile-card .field-hint { margin-top: 6px; }
+
+/* Мои объявления и форма */
+.page-heading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 20px; }
+.page-heading .page-title { margin: 0; }
+.my-listing-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.listing-form-page { max-width: 760px; }
+.listing-form-photo { width: 160px; height: 120px; object-fit: cover; border-radius: 8px; }
+.form textarea { width: 100%; }
+
 /* Бургер: квадратная кнопка без стандартной рамки браузера, удобная для пальца */
 .mobile-menu-btn {
   width: 44px;
