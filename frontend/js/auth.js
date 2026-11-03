@@ -47,7 +47,7 @@
   
   const profileBtn = document.createElement('a');
   profileBtn.href = dashboardHref();
-  profileBtn.className = 'btn secondary';
+  profileBtn.className = 'btn btn-secondary btn-sm'; // тот же стиль, что у «Вход»
   profileBtn.textContent = 'Профиль';
 
   container.appendChild(profileBtn);
@@ -81,6 +81,13 @@
     const form = document.getElementById('loginForm');
     if (!form) return; // Если формы нет — выходим
 
+    // Ошибка показывается текстом под формой вместо всплывающего alert()
+    function showLoginError(message) {
+      const box = document.getElementById('loginError');
+      if (box) { box.textContent = message; box.hidden = false; }
+      else alert(message);
+    }
+
     // Обработка отправки формы
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -89,7 +96,7 @@
       const password = form.querySelector('#password')?.value.trim();
 
       if (!email || !password) {
-        alert('Заполните все поля.');
+        showLoginError('Заполните email и пароль.');
         return;
       }
 
@@ -100,13 +107,14 @@
           body: JSON.stringify({ email, password })
         });
 
+        const data = await res.json().catch(() => ({}));
+
         if (!res.ok) {
-          alert('Ошибка входа. Проверьте данные.');
+          // Сервер различает «неверный пароль» (401) и «аккаунт заблокирован» (403) —
+          // показываем именно его сообщение, а не общее «проверьте данные»
+          showLoginError(data.error || 'Ошибка входа. Проверьте email и пароль.');
           return;
         }
-
-        const data = await res.json();
-        console.log('Успешный вход:', data);
 
         if (data.token) sessionStorage.setItem('token', data.token);
         if (data.user?.email) sessionStorage.setItem('userEmail', data.user.email);
@@ -115,9 +123,9 @@
         window.location.href = '/index.html';
       } catch (err) {
         console.error('Ошибка запроса:', err);
-        alert('Не удалось соединиться с сервером.');
+        showLoginError('Не удалось соединиться с сервером.');
       }
-    });
+    }); 
 
     // Переключатель видимости пароля
     const togglePassword = document.getElementById('togglePassword');
@@ -126,15 +134,11 @@
         const passwordInput = document.getElementById('password');
         if (!passwordInput) return;
 
-        if (passwordInput.type === 'password') {
-          passwordInput.type = 'text';
-          togglePassword.textContent = '🙈';
-          togglePassword.setAttribute('aria-label', 'Скрыть пароль');
-        } else {
-          passwordInput.type = 'password';
-          togglePassword.textContent = '👁️';
-          togglePassword.setAttribute('aria-label', 'Показать пароль');
-        }
+        // Меняем только подпись для скринридера; иконка — SVG в auth.html (без эмодзи)
+        const show = passwordInput.type === 'password';
+        passwordInput.type = show ? 'text' : 'password';
+        togglePassword.setAttribute('aria-label', show ? 'Скрыть пароль' : 'Показать пароль');
+        togglePassword.classList.toggle('is-active', show);
       });
     }
   }
@@ -156,21 +160,6 @@
 
 
 
-// Бургер-меню
-document.addEventListener('DOMContentLoaded', () => {
-  const menuBtn = document.querySelector('.mobile-menu-btn');
-  const navMenu = document.getElementById('navMenu');
-
-  if (menuBtn && navMenu) {
-    menuBtn.addEventListener('click', () => {
-      navMenu.classList.toggle('active');
-    });
-
-    // Закрываем меню при клике вне
-    document.addEventListener('click', (e) => {
-      if (!menuBtn.contains(e.target) && !navMenu.contains(e.target)) {
-        navMenu.classList.remove('active');
-      }
-    });
-  }
-});
+// Бургер-меню здесь больше НЕ обрабатываем: его уже включают layout.js
+// (внутренние страницы) и index.js (главная). Второй обработчик на той же
+// кнопке переключал класс обратно, и меню не открывалось.

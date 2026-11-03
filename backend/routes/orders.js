@@ -33,19 +33,29 @@ router.post('/', (req, res) => {
   // Клиентский total игнорируется и не сохраняется.
   const placeholders = normalized.map(() => '?').join(',');
   const itemIds = normalized.map(i => i.id);
+  // Цена в базе хранится текстом. Если в старой записи там не число
+  // (например «договорная»), CAST уронил бы весь запрос — поэтому
+  // превращаем в число только то, что действительно похоже на число.
   db.all(
-    `SELECT id, CAST(price AS REAL) AS price FROM listings WHERE id IN (${placeholders})`,
+    `SELECT id, title,
+            (CASE WHEN price ~ '^[0-9]+(\\.[0-9]+)?$' THEN price::numeric END)::float8 AS price
+     FROM listings
+     WHERE id IN (${placeholders}) AND COALESCE(moderation_status, 'published') <> 'removed'`,
     itemIds,
     (err, rows) => {
       if (err) {
         console.error('Error fetching listing prices:', err);
-        return res.status(500).json({ error: 'Failed to create order' });
+        return res.status(500).json({ error: 'Не удалось оформить заказ, попробуйте позже' });
       }
 
       const priceById = new Map((rows || []).map(r => [r.id, r.price]));
       const missing = normalized.filter(i => !priceById.has(i.id));
       if (missing.length > 0) {
-        return res.status(400).json({ error: 'Some items do not exist' });
+        return res.status(400).json({ error: 'Некоторые товары из корзины уже сняты с продажи. Удалите их из корзины.' });
+      }
+      const noPrice = (rows || []).find(r => r.price === null);
+      if (noPrice) {
+        return res.status(400).json({ error: `У товара «${noPrice.title}» не указана цена — заказ оформить нельзя` });
       }
 
       const total = normalized.reduce(
@@ -144,7 +154,7 @@ router.get('/', (req, res) => {
 
           orders.forEach((order, idx) => {
             db.all(
-              'SELECT oi.*, l.title, l.category, l.imagePath FROM order_items oi LEFT JOIN listings l ON oi.listing_id = l.id WHERE oi.order_id = ?',
+             `SELECT oi.*, l.title, l.category, CASE WHEN l.imagePath <> '' THEN '/uploads/' || l.imagePath ELSE '' END AS "imagePath" FROM order_items oi LEFT JOIN listings l ON oi.listing_id = l.id WHERE oi.order_id = ?`,
               [order.id],
               (err, items) => {
                 if (err) {
@@ -186,7 +196,7 @@ router.get('/:id', (req, res) => {
 
       // Получаем товары в заказе
       db.all(
-        'SELECT oi.*, l.title, l.category, l.imagePath, l.description FROM order_items oi LEFT JOIN listings l ON oi.listing_id = l.id WHERE oi.order_id = ?',
+         `SELECT oi.*, l.title, l.category, CASE WHEN l.imagePath <> '' THEN '/uploads/' || l.imagePath ELSE '' END AS "imagePath", l.description FROM order_items oi LEFT JOIN listings l ON oi.listing_id = l.id WHERE oi.order_id = ?`,
         [orderId],
         (err, items) => {
           if (err) {
@@ -203,7 +213,9 @@ router.get('/:id', (req, res) => {
   );
 });
 
-// Обновить статус заказа (только для владельца заказа или админа)
+// Обновить статус заказа.
+// Покупатель может только ОТМЕНИТЬ свой заказ, пока он ещё не подтверждён.
+// Ставить «подтверждён / отправлен / доставлен» сам себе покупатель не должен.
 router.patch('/:id', (req, res) => {
   const user = getUserFromAuthHeader(req);
   if (!user) return res.status(401).json({ error: 'Unauthorized' });
@@ -211,9 +223,8 @@ router.patch('/:id', (req, res) => {
   const orderId = req.params.id;
   const { status } = req.body;
 
-  const validStatuses = ['pending', 'confirmed', 'shipped', 'delivered', 'cancelled'];
-  if (!status || !validStatuses.includes(status)) {
-    return res.status(400).json({ error: 'Invalid status' });
+  if (status !== 'cancelled') {
+    return res.status(403).json({ error: 'Покупатель может только отменить заказ' });
   }
 
   // Проверяем что это заказ пользователя
@@ -223,6 +234,9 @@ router.patch('/:id', (req, res) => {
     (err, order) => {
       if (err) return res.status(500).json({ error: 'DB error' });
       if (!order) return res.status(404).json({ error: 'Order not found' });
+      if (order.status !== 'pending') {
+        return res.status(400).json({ error: 'Отменить можно только заказ, который ещё не подтверждён' });
+      }
 
       db.run(
         'UPDATE orders SET status = ? WHERE id = ?',
@@ -230,8 +244,8 @@ router.patch('/:id', (req, res) => {
         (err) => {
           if (err) return res.status(500).json({ error: 'DB error' });
           res.json({ success: true, status });
-        }
-      );
+    }
+  );
     }
   );
 });

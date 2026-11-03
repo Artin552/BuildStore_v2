@@ -107,7 +107,9 @@ function saveDocuments(docs, tag) {
 
 // === Регистрация ===
 router.post('/register', (req, res) => {
-  const { name, email, password, type, organization, consent } = req.body;
+  const { name, password, type, organization, consent } = req.body;
+  // Email храним и сравниваем в нижнем регистре: User@Mail.ru и user@mail.ru — один человек
+  const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
 
   if (!email || !password) return res.status(400).json({ error: 'Email и пароль обязательны' });
 
@@ -132,8 +134,8 @@ router.post('/register', (req, res) => {
     if (orgError) return res.status(400).json({ error: orgError });
   }
 
-  // проверим, нет ли уже такого email
-  db.get('SELECT * FROM users WHERE email = ?', [email], async (err, row) => {
+// проверим, нет ли уже такого email (без учёта регистра)
+  db.get('SELECT * FROM users WHERE LOWER(email) = ?', [email], async (err, row) => {
     if (err) {
       console.error('DB error in /register:', err);
       return res.status(500).json({ error: 'Ошибка при регистрации' });
@@ -200,13 +202,15 @@ router.post('/register', (req, res) => {
 
 // === Авторизация ===
 router.post('/login', (req, res) => {
-  const { email, password } = req.body;
+  const { password } = req.body;
+  const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
 
-  if (typeof email !== 'string' || typeof password !== 'string' || !email || !password) {
+  if (typeof password !== 'string' || !email || !password) {
     return res.status(400).json({ success: false, error: 'Неверный логин или пароль' });
   }
 
-  db.get('SELECT * FROM users WHERE email = ?', [email], async (err, user) => {
+  // LOWER(email) — чтобы находились и старые аккаунты, созданные до приведения к нижнему регистру
+  db.get('SELECT * FROM users WHERE LOWER(email) = ?', [email], async (err, user) => {
     if (err) {
       console.error('DB error in /login:', err);
       return res.status(500).json({ success: false, error: 'Ошибка входа' });
@@ -232,12 +236,12 @@ router.post('/login', (req, res) => {
 
 // === Забыли пароль:
 router.post('/forgot', (req, res) => {
-  const { email } = req.body;
+  const email = typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
   if (!email) return res.status(400).json({ error: 'Email обязателен' });
 
   // Note: we intentionally never reveal whether an email exists in the system.
   // Always respond with a generic success message so attackers cannot enumerate accounts.
-  db.get('SELECT * FROM users WHERE email = ?', [email], async (err, user) => {
+   db.get('SELECT * FROM users WHERE LOWER(email) = ?', [email], async (err, user) => {
     if (!user) {
       // generic reply
       return res.json({ message: 'Если email зарегистрирован, вы получите код.' });
@@ -362,7 +366,9 @@ router.get('/me', (req, res) => {
     return res.status(401).json({ error: 'Unauthorized' });
   }
 
-  db.get('SELECT id, name, email, role, created_at, avatar_path FROM users WHERE id = ?', [user.id], (err, row) => {
+ // type/status/reject_reason нужны личному кабинету: без type ниже
+  // никогда не срабатывала ветка «организация» и баннер «на проверке»
+  db.get('SELECT id, name, email, role, type, status, reject_reason, created_at, avatar_path FROM users WHERE id = ?', [user.id], (err, row) => {
     if (err) {
       console.error('DB error in /me:', err);
       return res.status(500).json({ error: 'DB error' });

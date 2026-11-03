@@ -260,8 +260,12 @@ router.post('/users/:id/block', requireAdmin, (req, res) => {
 router.post('/users/:id/role', requireAdmin, (req, res) => {
   const id = Number(req.params.id);
   const role = req.body.role;
-  if (!['user', 'moderator', 'admin'].includes(role)) {
+   if (!['user', 'moderator', 'admin'].includes(role)) {
     return res.status(400).json({ error: 'Некорректная роль' });
+  }
+  // Как и с блокировкой: нельзя случайно снять права администратора с самого себя
+  if (id === req.staffUser.id && role !== 'admin') {
+    return res.status(400).json({ error: 'Нельзя понизить собственную роль' });
   }
   db.get('SELECT id, email FROM users WHERE id = ?', [id], (err, row) => {
     if (err) return res.status(500).json({ error: 'Ошибка сервера' });

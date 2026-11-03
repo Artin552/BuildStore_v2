@@ -14,11 +14,12 @@ const cors = require('cors');
 const path = require('path');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-require('dotenv').config(); // Загружаем переменные окружения из .env файла
+require('dotenv').config({ path: path.join(__dirname, '.env') }); // .env из папки backend, откуда бы ни запускали
 const authRoutes = require('./routes/auth'); // Маршруты аутентификации
 const listingsRoutes = require('./routes/listings'); // Маршруты объявлений
 const ordersRoutes = require('./routes/orders'); // Маршруты заказов
 const adminRoutes = require('./routes/admin'); // Админ-панель (модерация, пользователи)
+const db = require('./db'); // нужен, чтобы дождаться готовности базы и для /api/health
 
 // ============================================================
 // ОБРАБОТЧИКИ ОШИБОК
@@ -51,14 +52,23 @@ if (process.env.TRUST_PROXY) {
 // Включаем CORS (Cross-Origin Resource Sharing) для доступа с разных доменов.
 // В продакшене задайте ALLOWED_ORIGIN, например: https://mydomain.ru
 const allowedOrigin = process.env.ALLOWED_ORIGIN;
-app.use(cors(allowedOrigin ? { origin: allowedOrigin } : {}));
+// exposedHeaders — чтобы фронтенд мог прочитать общее число товаров из заголовка X-Total-Count
+app.use(cors(allowedOrigin
+  ? { origin: allowedOrigin, exposedHeaders: ['X-Total-Count'] }
+  : { exposedHeaders: ['X-Total-Count'] }));
 
 // Включаем Helmet для защиты от уязвимостей в HTTP заголовках
 app.use(helmet());
 
-// Предупреждение о секретах (не падаем, чтобы не ломать локальную разработку)
-if (!process.env.JWT_SECRET) {
-  console.warn('⚠️  JWT_SECRET не задан — используется fallback из routes/auth.js. Для продакшена задайте JWT_SECRET в .env!');
+// Секрет для подписи токенов. Локально — только предупреждение,
+// на боевом сервере (NODE_ENV=production) без него не запускаемся:
+// запасной секрет виден всем в открытом репозитории на GitHub
+if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
+  if (process.env.NODE_ENV === 'production') {
+    console.error('❌ JWT_SECRET не задан или короче 32 символов. Задайте его в backend/.env');
+    process.exit(1);
+  }
+  console.warn('⚠️  JWT_SECRET не задан или короче 32 символов — для продакшена задайте его в .env!');
 }
 
 // Ограничиваем размер JSON тела запроса до 2MB (защита от DoS атак)
@@ -109,6 +119,16 @@ app.use((req, res, next) => {
 // ============================================================
 // ПОДКЛЮЧЕНИЕ API МАРШРУТОВ
 // ============================================================
+// Проверка «жив ли сервер и база»: откройте http://127.0.0.1:4000/api/health
+app.get('/api/health', async (req, res) => {
+  try {
+    await db.pool.query('SELECT 1');
+    res.json({ ok: true, db: 'connected' });
+  } catch (err) {
+    res.status(503).json({ ok: false, db: 'error', error: err.message });
+  }
+});
+
 // Все маршруты аутентификации начинаются с /api/auth
 app.use('/api/auth', authRoutes.router);
 
@@ -210,21 +230,31 @@ app.get(['/', '/index.html'], (req, res) => {
 // ЗАПУСК СЕРВЕРА
 // ============================================================
 const HOST = process.env.HOST || '127.0.0.1'; // По умолчанию локальный хост
-const server = app.listen(PORT, HOST, () => {
-  console.log(`✅ Сервер запущен: http://${HOST}:${PORT}`);
-});
+let server;
+// Сначала ждём, пока база подключится и создаст таблицы, и только потом
+// открываем порт. Раньше «✅ Сервер запущен» печаталось даже при ошибке пароля.
+db.dbReady
+  .then(() => {
+    server = app.listen(PORT, HOST, () => {
+      console.log(`✅ Сервер запущен: http://${HOST}:${PORT}`);
+    });
+  })
+  .catch((err) => {
+    console.error('❌ Не удалось подключиться к PostgreSQL:', err.message);
+    console.error('   Проверьте PGHOST, PGPORT, PGDATABASE, PGUSER, PGPASSWORD в backend/.env');
+    process.exit(1);
+  });
 
 // ============================================================
 // ОБРАБОТКА ЗАВЕРШЕНИЯ СЕРВЕРА
 // ============================================================
-// При получении сигнала SIGINT (Ctrl+C) корректно завершаем сервер
-process.on('SIGINT', () => {
-  console.log('SIGINT received, shutting down');
-  server.close(() => process.exit(0));
-});
+// (server ещё может не существовать, если база не успела подключиться)
+function shutdown(signal) {
+  console.log(`${signal} received, shutting down`);
+  if (server) server.close(() => process.exit(0));
+  else process.exit(0);
+}
+process.on('SIGINT', () => shutdown('SIGINT'));
 
 // При получении сигнала SIGTERM корректно завершаем сервер
-process.on('SIGTERM', () => {
-  console.log('SIGTERM received, shutting down');
-  server.close(() => process.exit(0));
-});
+process.on('SIGTERM', () => shutdown('SIGTERM'));

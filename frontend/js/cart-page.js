@@ -36,10 +36,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (items.length === 0) {
       container.innerHTML = `
-        <div class="cart-empty">
-          <p style="font-size: 48px; margin-bottom: 16px;">🛒</p>
-          <p style="font-size: 18px; margin-bottom: 24px;">Ваша корзина пуста</p>
-          <a href="/frontend/listings.html" class="btn">Продолжить покупки</a>
+        <div class="empty-state">
+          <div class="empty-state-title">Ваша корзина пуста</div>
+          <a href="/frontend/listings.html" class="btn btn-primary" style="margin-top:16px;">Перейти в каталог</a>
         </div>
       `;
       return;
@@ -47,23 +46,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
     let itemsHtml = '';
     items.forEach(item => {
-      const imgUrl = item.imagePath || `https://picsum.photos/seed/${encodeURIComponent(item.title)}/200/200`;
+      // Внешние картинки (picsum.photos) блокирует защита CSP — показываем свою заглушку
+      const imgUrl = item.imagePath || '/img/placeholder.svg';
       const itemTotal = parseFloat(item.price || 0) * (item.quantity || 1);
       
       itemsHtml += `
-        <div class="cart-item" data-item-id="${item.id}">
-          <img src="${imgUrl}" alt="${esc(item.title)}" class="cart-item-image">
+        <img src="${esc(imgUrl)}" alt="${esc(item.title)}" class="cart-item-image">
           <div class="cart-item-info">
             <div class="cart-item-title">${esc(item.title)}</div>
-            <div class="cart-item-price">${item.price || 'По договорённости'} ₽</div>
+            <div class="cart-item-price">${window.BuildStoreApi.formatPrice(item.price)}</div>
             <div class="cart-item-quantity">
-              <button type="button" class="btn secondary" style="padding: 4px 8px; font-size: 14px;" data-action="decrement" data-item-id="${item.id}">−</button>
-              <input type="number" value="${item.quantity || 1}" min="1" class="quantity-input" data-item-id="${item.id}" style="width: 50px; padding: 4px; border: 1px solid #ddd; border-radius: 4px; text-align: center;">
-              <button type="button" class="btn secondary" style="padding: 4px 8px; font-size: 14px;" data-action="increment" data-item-id="${item.id}">+</button>
-              <span style="margin-left: 16px; color: #666;">= ${itemTotal.toFixed(2)} ₽</span>
+              <button type="button" class="btn btn-secondary btn-sm" data-action="decrement" data-item-id="${item.id}" aria-label="Уменьшить количество">−</button>
+              <input type="number" value="${item.quantity || 1}" min="1" max="999" class="quantity-input" data-item-id="${item.id}" aria-label="Количество">
+              <button type="button" class="btn btn-secondary btn-sm" data-action="increment" data-item-id="${item.id}" aria-label="Увеличить количество">+</button>
+              <span class="text-muted">= ${window.BuildStoreApi.formatPrice(itemTotal)}</span>
             </div>
           </div>
-          <button type="button" class="cart-item-remove" data-action="remove" data-item-id="${item.id}">✕ Удалить</button>
+          <button type="button" class="cart-item-remove" data-action="remove" data-item-id="${item.id}">Удалить</button>
         </div>
       `;
     });
@@ -76,21 +75,27 @@ document.addEventListener('DOMContentLoaded', () => {
         </div>
         <div class="cart-summary-row">
           <span>Подитог:</span>
-          <span>${total.toFixed(2)} ₽</span>
+          <span>${window.BuildStoreApi.formatPrice(total)}</span>
         </div>
         <div class="cart-summary-total">
-          Итого: ${total.toFixed(2)} ₽
+          Итого: ${window.BuildStoreApi.formatPrice(total)}
         </div>
-        <button class="btn primary" style="width: 100%; margin-top: 16px;" id="checkoutBtn">
+        <p class="text-muted" style="font-size:13px;">Итоговую сумму пересчитает сервер по актуальным ценам.</p>
+        <button type="button" class="btn btn-primary" style="width: 100%; margin-top: 16px;" id="checkoutBtn">
           Оформить заказ
         </button>
-        <a href="/frontend/listings.html" class="btn secondary" style="width: 100%; margin-top: 8px; text-align: center; display: block;">
+        <a href="/frontend/listings.html" class="btn btn-secondary" style="width: 100%; margin-top: 8px;">
           Продолжить покупки
         </a>
       </div>
     `;
 
-    container.innerHTML = `<div style="max-width: 1000px;">${itemsHtml}</div>${cartSummary}`;
+       container.innerHTML = `<div style="max-width: 1000px;">${itemsHtml}</div>${cartSummary}`;
+
+    // Нет файла картинки на сервере — заглушка (обработчик из JS, т.к. onerror="" блокирует CSP)
+    container.querySelectorAll('.cart-item-image').forEach((img) => {
+      img.addEventListener('error', () => { img.src = '/img/placeholder.svg'; }, { once: true });
+    });
 
     // Обработчик для кнопки оформления заказа
     document.getElementById('checkoutBtn').addEventListener('click', checkoutOrder);
@@ -152,15 +157,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
       // Показываем успешное сообщение
       container.innerHTML = `
-        <div style="text-align: center; padding: 60px 20px;">
-          <p style="font-size: 64px; margin-bottom: 16px;">✅</p>
-          <h2 style="font-size: 28px; margin-bottom: 16px;">Заказ успешно оформлен!</h2>
-          <p style="font-size: 18px; margin-bottom: 8px;">Номер заказа: <strong>#${order.id}</strong></p>
-          <p style="font-size: 16px; margin-bottom: 24px; color: #666;">Сумма: ${order.total} ₽</p>
-          <p style="font-size: 14px; color: #999; margin-bottom: 24px;">Вы можете отследить заказ в личном кабинете</p>
-          <div style="display: flex; gap: 12px; justify-content: center;">
-            <a href="/frontend/dashboard.html" class="btn">Мои заказы</a>
-            <a href="/frontend/listings.html" class="btn secondary">Продолжить покупки</a>
+            <div class="empty-state" role="status">
+          <div class="empty-state-title">Заказ #${order.id} оформлен</div>
+          <div class="empty-state-description">Сумма: ${window.BuildStoreApi.formatPrice(order.total)}. Статус заказа видно на странице «Мои заказы».</div>
+          <div style="display: flex; gap: 12px; justify-content: center; margin-top: 16px; flex-wrap: wrap;">
+            <a href="/frontend/orders.html" class="btn btn-primary">Мои заказы</a>
+            <a href="/frontend/listings.html" class="btn btn-secondary">Продолжить покупки</a>
           </div>
         </div>
       `;

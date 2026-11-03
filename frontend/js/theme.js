@@ -123,39 +123,47 @@
    * @param {HTMLElement} container - контейнер для переключателя
    */
   function createThemeToggle(container) {
-    if (!container) return;
-    
-    // Эмодзи убраны (ТЗ 2A.3): <select> не поддерживает HTML-разметку опций,
-    // иконки рисуются CSS-переменными темы; здесь — только текстовые подписи.
+    // Не создаём второй переключатель, если он уже есть (главная + layout.js)
+    if (!container || container.querySelector('.theme-switch')) return;
+
+    // Три кнопки-иконки вместо громоздкого <select> «Тема: как в системе»
+    const svg = (path) => '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + path + '</svg>';
     const themes = [
-      { value: 'system', label: 'Тема: как в системе' },
-      { value: 'light', label: 'Тема: светлая' },
-      { value: 'dark', label: 'Тема: тёмная' }
+      { value: 'system', label: 'Как в системе', icon: svg('<rect width="20" height="14" x="2" y="3" rx="2"/><path d="M8 21h8M12 17v4"/>') },
+      { value: 'light', label: 'Светлая тема', icon: svg('<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>') },
+      { value: 'dark', label: 'Тёмная тема', icon: svg('<path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/>') }
     ];
-    
-    const current = getStoredTheme();
-    
-    const select = document.createElement('select');
-    select.id = 'themeSelect';
-    select.className = 'theme-select';
-    select.setAttribute('aria-label', 'Выбрать тему оформления');
-    
-    themes.forEach(theme => {
-      const option = document.createElement('option');
-      option.value = theme.value;
-      option.textContent = theme.label;
-      if (theme.value === current) {
-        option.selected = true;
-      }
-      select.appendChild(option);
+
+    const group = document.createElement('div');
+    group.className = 'theme-switch';
+    group.setAttribute('role', 'group');
+    group.setAttribute('aria-label', 'Тема оформления');
+
+    function markActive() {
+      const current = getStoredTheme();
+      group.querySelectorAll('button').forEach((btn) => {
+        btn.setAttribute('aria-pressed', String(btn.dataset.theme === current));
+      });
+    }
+
+    themes.forEach((theme) => {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.dataset.theme = theme.value;
+      btn.title = theme.label;
+      btn.setAttribute('aria-label', theme.label);
+      btn.innerHTML = theme.icon;
+      btn.addEventListener('click', () => {
+        setTheme(theme.value);
+        markActive();
+      });
+      group.appendChild(btn);
     });
-    
-    select.addEventListener('change', (e) => {
-      setTheme(e.target.value);
-    });
-    
-    container.appendChild(select);
+
+    markActive();
+    container.appendChild(group);
   }
+    
   
   // Экспорт функций в глобальную область
   window.BuildStoreTheme = {
