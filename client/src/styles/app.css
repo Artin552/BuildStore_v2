@@ -28,6 +28,9 @@
   .add-listing-label { display: none; }
 }
 
+/* Баннер растёт по содержимому: при фиксированной высоте на невысоком экране текст обрезался */
+.hero { height: auto; min-height: clamp(340px, 50vh, 520px); padding: 24px 0; }
+
 /* Кнопки внутри блоков «пусто / ошибка» */
 .empty-state-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; margin-top: 16px; }
 

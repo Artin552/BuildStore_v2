@@ -17,7 +17,7 @@
 | Корзина | `localStorage` ключ `buildstore_cart`, массив `{id, title, price, imagePath, quantity}` | Корзина пользователя не пропадёт |
 | Данные с сервера | Свой тонкий слой `client/src/api/` на `fetch`, все ответы типизированы | Меньше зависимостей, проще объяснить на защите |
 | Разработка | `npm run dev` в `client/` (порт 5173). Vite проксирует `/api` и `/uploads` на `http://127.0.0.1:4000` | Не нужны настройки CORS |
-| Продакшен | `npm run build` → `client/dist`. Express раздаёт `client/dist`, а любой неизвестный GET-путь (не `/api`, не `/uploads`, не `/frontend`) отдаёт `index.html` (SPA fallback). В Express 5 запись `app.get('*')` больше не работает: делать через `app.use((req,res,next)=>…)` с проверкой `req.method === 'GET'` | Один сервер, один порт |
+| Продакшен | `npm run build` → `client/dist`. Express раздаёт `client/dist`, а неизвестный GET-путь без расширения файла (не `/api`, не `/uploads`, не `/frontend`) отдаёт `index.html` (SPA fallback). Старая главная осталась на `/index.html`. В Express 5 запись `app.get('*')` больше не работает: делать через `app.use((req,res,next)=>…)` с проверкой `req.method === 'GET'` | Один сервер, один порт |
 | CSP | Не ослаблять helmet. Никаких встроенных `<script>` и `onclick` — в React их и так нет | Защита от XSS |
 | Зависимости | Только `react`, `react-dom`, `react-router-dom` + dev: `vite`, `@vitejs/plugin-react`, `typescript`, `@types/*`. Остальное — только по необходимости и с объяснением | Меньше зависимостей — меньше уязвимостей |
 
