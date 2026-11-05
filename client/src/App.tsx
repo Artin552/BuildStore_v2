@@ -17,6 +17,12 @@ import PlaceholderPage from './pages/PlaceholderPage';
 import ProductPage from './pages/ProductPage';
 import RegisterPage from './pages/RegisterPage';
 import ResetPage from './pages/ResetPage';
+import AdminAudit from './pages/admin/AdminAudit';
+import AdminDashboard from './pages/admin/AdminDashboard';
+import AdminLayout from './pages/admin/AdminLayout';
+import AdminListings from './pages/admin/AdminListings';
+import AdminOrganizations from './pages/admin/AdminOrganizations';
+import AdminUsers from './pages/admin/AdminUsers';
 
 export default function App() {
   return (
@@ -48,7 +54,19 @@ export default function App() {
 
         <Route path="/contacts" element={<PlaceholderPage title="Контакты" />} />
         <Route path="/privacy" element={<PlaceholderPage title="Политика конфиденциальности" />} />
-        <Route path="/admin/*" element={<PlaceholderPage title="Админ-панель" />} />
+
+        {/* Только для сотрудников: модератор или админ. Раздел «Пользователи» — только админ */}
+        <Route element={<ProtectedRoute allow="staff" />}>
+          <Route path="/admin" element={<AdminLayout />}>
+            <Route index element={<AdminDashboard />} />
+            <Route path="organizations" element={<AdminOrganizations />} />
+            <Route path="listings" element={<AdminListings />} />
+            <Route path="audit" element={<AdminAudit />} />
+            <Route element={<ProtectedRoute allow="admin" />}>
+              <Route path="users" element={<AdminUsers />} />
+            </Route>
+          </Route>
+        </Route>
 
         <Route path="*" element={<NotFoundPage />} />
       </Route>

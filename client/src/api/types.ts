@@ -149,12 +149,11 @@ export interface OrderWithItems extends Order {
 }
 
 // ---------- Админка ----------
-// Ключи приходят маленькими буквами (см. раздел 6, пункт 5 плана)
 export interface AdminSummary {
-  pendingorgs: number;
-  totalorgs: number;
-  totalusers: number;
-  totallistings: number;
+  pendingOrgs: number;
+  totalOrgs: number;
+  totalUsers: number;
+  totalListings: number;
 }
 
 export interface Organization {

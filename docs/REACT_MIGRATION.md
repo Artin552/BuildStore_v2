@@ -109,8 +109,9 @@ client/
 - Статусы заказа: `pending` (ожидает подтверждения), `cancelled`. Других пока никто не выставляет — см. раздел 6.
 
 ### Админка `/api/admin` (staff = `moderator` | `admin`; роль каждый раз проверяется по базе)
-- `GET /summary` → `{ pendingorgs, totalorgs, totalusers, totallistings }`. ⚠️ Ключи приходят **маленькими буквами**: PostgreSQL. Нормализовать на клиенте или исправить SQL на `AS "pendingOrgs"`.
-- `GET /organizations?status=pending|approved|rejected&q=&page=&limit=` → `[{ id, userId, orgName, inn, ogrn, legalAddress, contactPerson, contactPosition, phone, email, documents: ["/uploads/documents/…"], status, rejectReason, reviewedBy, reviewedAt, createdAt, ownerName, ownerEmail }]` + `X-Total-Count`.
+- `GET /summary` → `{ pendingOrgs, totalOrgs, totalUsers, totalListings }`.
+- `GET /documents/:file` → файл документа организации, только для staff.
+- `GET /organizations?status=pending|approved|rejected&q=&page=&limit=` → `[{ id, userId, orgName, inn, ogrn, legalAddress, contactPerson, contactPosition, phone, email, documents: ["/api/admin/documents/…"], status, rejectReason, reviewedBy, reviewedAt, createdAt, ownerName, ownerEmail }]` + `X-Total-Count`.
 - `GET /organizations/:id` → одна заявка.
 - `POST /organizations/:id/review` — `{ decision: "approve"|"reject", reason }` (при `reject` причина обязательна). Синхронно меняет статус пользователя на `active`/`rejected` и пишет в журнал.
 - `GET /listings?status=published|removed&page=&limit=` → сырые строки `listings` + `owner_name, owner_email, owner_type`. ⚠️ Ключи `imagepath`, `certificatepath`, `reviewscount` — маленькими буквами и **без** префикса `/uploads/`.
@@ -119,10 +120,10 @@ client/
 - `POST /users/:id/block` (только admin) — `{ block: boolean }`. Себя заблокировать нельзя.
 - `POST /users/:id/role` (только admin) — `{ role: "user"|"moderator"|"admin" }`. Себе роль понизить нельзя.
 - `GET /users/:id/listings` → до 100 объявлений пользователя.
-- `GET /audit?page=&limit=` → `[{ id, actor_id, actor_email, action, target_type, target_id, details, created_at }]`. Действия: `organization.approved|rejected`, `listing.removed|published`, `user.block|unblock|role`.
+- `GET /audit?page=&limit=` → `[{ id, actor_id, actor_email, action, target_type, target_id, details, created_at }]` + `X-Total-Count`. Действия: `organization.approved|rejected`, `listing.removed|published`, `user.block|unblock|role`.
 
 ### Файлы
-- `/uploads/<имя>` — фото объявлений, `/uploads/avatars/…`, `/uploads/certificates/…`, `/uploads/documents/…`.
+- `/uploads/<имя>` — фото объявлений, `/uploads/avatars/…`, `/uploads/certificates/…`. Документы организаций через `/uploads` недоступны.
 
 ## 5. Порядок работ
 
@@ -138,11 +139,11 @@ client/
 
 ## 6. Известные проблемы бэкенда (исправить по ходу)
 
-1. **🔴 Документы организаций открыты всем.** `/uploads/documents/*` раздаётся статикой без проверки прав, а это выписки ЕГРЮЛ, доверенности, персональные данные. Нужно: запретить `/uploads/documents` в статике и сделать `GET /api/admin/documents/:file` с `requireStaff`. Клиент скачивает файл через `fetch` с токеном и открывает через `URL.createObjectURL`.
+1. **Документы организаций закрыты.** Они лежат в `private_uploads/documents` вне раздачи статики и доступны только через `GET /api/admin/documents/:file` с `requireStaff`. Клиент скачивает файл через `fetch` с токеном и открывает через `URL.createObjectURL`. При деплое и бэкапах нужно учитывать папку `private_uploads`.
 2. **Удаление объявления, которое уже покупали,** теперь отвечает 409 с понятным текстом, а фото удаляется только после успешного удаления записи. Продавец пока не может убрать такой товар из продажи: для этого нужно мягкое удаление (например, `moderation_status = 'deleted'`).
 3. **Продавец не видит заказы на свои товары,** и никто не может перевести заказ дальше `pending`. Для «коммерческого» вида нужен раздел «Заказы на мои товары» и статусы `confirmed`, `shipped`, `delivered`.
 4. **`PUT /api/listings/:id` не позволяет заменить сертификат,** `title` при редактировании не проверяется на длину. Ещё `PUT` не проверяет, заблокирован ли продавец, и не требует сертификат при смене категории на «Электроинструмент» или «СИЗ» (сейчас это проверяет только форма).
-5. Ключи в нижнем регистре в `/api/admin/summary` и `/api/admin/listings` (см. выше).
+5. Ключи в нижнем регистре остались в `/api/admin/listings` (см. выше). В `/api/admin/summary` исправлено.
 6. Токен в `localStorage` → в декабре переход на `HttpOnly` cookie.
 7. Рейтинг и отзывы (`rating`, `reviewsCount`) есть в базе, но API для отзывов нет. Либо сделать, либо убрать фильтр по рейтингу.
 8. **Файлы передаются в base64 внутри JSON,** поэтому лимиты заданы отдельно в `server.js`: объявления 21 МБ (только с действительным токеном), аватар 3 МБ, регистрация 30 МБ (документы в сумме до 22 МБ), всё остальное 2 МБ. Большие файлы держат память сервера: после диплома стоит перейти на `multipart/form-data`.

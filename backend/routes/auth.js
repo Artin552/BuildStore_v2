@@ -81,11 +81,16 @@ function sniffDocType(buffer) {
   return null;
 }
 
-// Сохраняет массив data-URL документов в uploads/documents,
+// Документы организаций содержат персональные данные, поэтому лежат ВНЕ папки uploads:
+// её раздаёт всем express.static, а эту папку сервер не раздаёт совсем.
+// Прочитать файл можно только через GET /api/admin/documents/:file с проверкой роли.
+const DOCUMENTS_DIR = path.join(__dirname, '..', '..', 'private_uploads', 'documents');
+
+// Сохраняет массив data-URL документов в DOCUMENTS_DIR,
 // возвращает список сохранённых имён файлов или строку с ошибкой
 function saveDocuments(docs, tag) {
   const MAX_BYTES = 10 * 1024 * 1024; // 10 МБ на файл (ТЗ 5.2)
-  const dir = path.join(__dirname, '..', '..', 'uploads', 'documents');
+  const dir = DOCUMENTS_DIR;
   fs.mkdirSync(dir, { recursive: true });
   const saved = [];
   for (let i = 0; i < docs.length; i++) {
@@ -394,5 +399,6 @@ router.get('/me', (req, res) => {
 module.exports = {
   router,
   getUserFromAuthHeader,
-  roleToJwt
+  roleToJwt,
+  DOCUMENTS_DIR
 };

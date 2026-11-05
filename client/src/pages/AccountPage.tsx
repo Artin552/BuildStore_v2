@@ -119,6 +119,12 @@ function ProfileCard({ user }: { user: Me }) {
         <Link to="/orders" className="btn btn-primary">
           Мои заказы
         </Link>
+        {/* Видно только сотрудникам. Настоящая защита — на сервере */}
+        {(user.role === 'admin' || user.role === 'moderator') && (
+          <Link to="/admin" className="btn btn-primary">
+            Админ-панель
+          </Link>
+        )}
         <button
           type="button"
           className="btn btn-secondary"

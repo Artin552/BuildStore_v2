@@ -139,6 +139,33 @@ export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promi
   return data;
 }
 
+// Скачать файл с проверкой прав. Обычная ссылка <a href> не отправляет токен, поэтому
+// закрытые файлы получаем через fetch. Blob — это содержимое файла в памяти браузера.
+export async function apiFetchBlob(path: string): Promise<Blob> {
+  const token = getToken();
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
+  try {
+    const res = await fetch(API_BASE + path, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      if (res.status === 401 && token) window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
+      const payload = (await res.json().catch(() => null)) as { error?: unknown } | null;
+      const message = typeof payload?.error === 'string' ? payload.error : `Ошибка сервера (${res.status})`;
+      throw new ApiError(message, res.status);
+    }
+    return await res.blob();
+  } catch (err) {
+    if (isAbortError(err)) throw new ApiError('Сервер не отвечает. Проверьте соединение и попробуйте ещё раз.', 0);
+    if (err instanceof TypeError) throw new ApiError('Не удалось соединиться с сервером.', 0);
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 // Запрос списка с пагинацией: вернёт элементы и общее число из заголовка X-Total-Count.
 export async function apiFetchList<T>(path: string, options: ApiOptions = {}): Promise<{ items: T[]; total: number }> {
   const { data, total } = await request<T[]>(path, options);

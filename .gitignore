@@ -9,4 +9,5 @@ node_modules/
 # Базы данных и загрузки пользователей
 *.db
 uploads/
+private_uploads/
 server.log
