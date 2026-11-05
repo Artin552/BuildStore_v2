@@ -11,6 +11,7 @@
 
 const express = require('express');
 const cors = require('cors');
+const fs = require('fs');
 const path = require('path');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
@@ -71,10 +72,6 @@ if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
   console.warn('⚠️  JWT_SECRET не задан или короче 32 символов — для продакшена задайте его в .env!');
 }
 
-// Ограничиваем размер JSON тела запроса до 2MB (защита от DoS атак)
-app.use(express.json({ limit: process.env.JSON_LIMIT || '2mb' }));
-app.use(express.urlencoded({ extended: true, limit: process.env.JSON_LIMIT || '2mb' }));
-
 // ============================================================
 // RATE LIMITERS (ограничение частоты запросов)
 // ============================================================
@@ -104,6 +101,32 @@ const resetLimiter = rateLimit({
   message: { error: 'Too many reset attempts, please request a new code later' }
 });
 app.use('/api/auth/reset', resetLimiter);
+
+// ============================================================
+// РАЗБОР ТЕЛА ЗАПРОСА И ЛИМИТЫ РАЗМЕРА
+// ============================================================
+// Стоит ПОСЛЕ ограничителей частоты: иначе сервер читал бы большой запрос в память
+// ещё до проверки, не превышен ли лимит запросов.
+// Файлы приходят в base64 внутри JSON, а base64 на треть больше самого файла.
+
+// Объявление: фото до 5 МБ и сертификат до 10 МБ — около 20 МБ в base64.
+// Большой запрос читаем только у вошедшего: токен проверяем до разбора тела.
+app.use('/api/listings', (req, res, next) => {
+  if (req.method !== 'POST' && req.method !== 'PUT') return next();
+  if (!authRoutes.getUserFromAuthHeader(req)) return res.status(401).json({ error: 'Требуется вход' });
+  next();
+}, express.json({ limit: '21mb' }));
+
+// Аватар до 2 МБ
+app.use('/api/auth/avatar', express.json({ limit: '3mb' }));
+
+// Регистрация организации: документы в сумме до 22 МБ. Адрес открыт всем,
+// поэтому лимит не больше необходимого, а частоту ограничивает authLimiter выше.
+app.use('/api/auth/register', express.json({ limit: '30mb' }));
+
+// Для всего остального — 2 МБ (защита от DoS атак). Уже разобранное тело этот обработчик пропускает.
+app.use(express.json({ limit: process.env.JSON_LIMIT || '2mb' }));
+app.use(express.urlencoded({ extended: true, limit: process.env.JSON_LIMIT || '2mb' }));
 
 // ============================================================
 // ЛОГИРОВАНИЕ ЗАПРОСОВ
@@ -164,15 +187,36 @@ app.use((err, req, res, next) => {
 // ============================================================
 // Блокируем любые запросы к .db-файлам ДО раздачи статики,
 // чтобы users.db и подобные файлы никогда не отдавались наружу
+// Смотрим только путь: поиск /catalog?q=a.db — обычная страница, а не файл базы
 app.use((req, res, next) => {
-  if (req.url.includes('.db')) {
+  if (req.path.includes('.db')) {
     return res.status(403).send('Forbidden');
   }
   next();
 });
 
+// Старая главная: на /index.html ведёт логотип на страницах из /frontend.
+// Маршрут стоит раньше статики React: в client/dist тоже есть файл index.html
+app.get('/index.html', (req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'index.html'));
+});
+
 // ============================================================
-// РАЗДАЧА СТАТИЧЕСКИХ ФАЙЛОВ (фронтенд)
+// РАЗДАЧА REACT-КЛИЕНТА (client/dist)
+// ============================================================
+// Стоит раньше старого фронтенда: в обеих папках есть /img/placeholder.svg
+const CLIENT_DIST = path.join(__dirname, '..', 'client', 'dist');
+const CLIENT_INDEX = path.join(CLIENT_DIST, 'index.html');
+if (!fs.existsSync(CLIENT_INDEX)) {
+  console.warn('⚠️  React-клиент не собран. Выполните npm run build в папке client');
+}
+
+// В именах файлов из /assets есть хеш содержимого, поэтому браузер может хранить их долго
+app.use('/assets', express.static(path.join(CLIENT_DIST, 'assets'), { immutable: true, maxAge: '1y' }));
+app.use(express.static(CLIENT_DIST, { index: false }));
+
+// ============================================================
+// РАЗДАЧА СТАТИЧЕСКИХ ФАЙЛОВ (старый фронтенд)
 // ============================================================
 // Раздаём CSS файлы при запросе http://localhost:4000/css/...
 app.use('/css', express.static(path.join(__dirname, '..', 'frontend', 'css')));
@@ -198,11 +242,7 @@ app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads'), {
 // ============================================================
 
 
-// Раздаём HTML файл при запросе http://localhost:4000/my-listings
-  app.get('/my-listings', (req, res) => {
-    res.sendFile(path.join(__dirname, '..', 'frontend', 'my-listings.html'));
-  });
-
+// Адрес /my-listings теперь обслуживает React, старая страница осталась по адресу с .html
   app.get('/my-listings.html', (req, res) => {
     res.sendFile(path.join(__dirname, '..', 'frontend', 'my-listings.html'));
   });
@@ -219,13 +259,31 @@ app.use(express.static(path.join(__dirname, '..', 'frontend'), { index: false })
 
 
 // ============================================================
-// ГЛАВНАЯ СТРАНИЦА
+// SPA FALLBACK
 // ============================================================
-// Все остальные GET запросы идут на главную страницу (index.html в корне)
-// Главная страница — доступна по / и /index.html
-app.get(['/', '/index.html'], (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'index.html'));
+// Неизвестный адрес API — ошибка в JSON, а не HTML-страница
+app.use('/api', (req, res) => {
+  res.status(404).json({ error: 'Адрес API не найден' });
 });
+
+// SPA fallback. На сервере есть одна страница React, а адреса вроде /catalog или /product/5
+// она разбирает сама в браузере. Поэтому на такие адреса отдаём её же.
+// В Express 5 запись app.get('*') не работает, поэтому это обычный обработчик.
+app.use((req, res, next) => {
+  if (req.method !== 'GET' && req.method !== 'HEAD') return next();
+  if (req.path.startsWith('/uploads/') || req.path.startsWith('/frontend/')) return next();
+  // Адрес с расширением — это файл. Если его нет, нужен честный 404: HTML вместо .js
+  // браузер не сможет запустить, и причину будет трудно найти
+  if (path.extname(req.path)) return next();
+
+  if (!fs.existsSync(CLIENT_INDEX)) {
+    return res.status(503).type('text/plain; charset=utf-8').send('React-клиент не собран. Выполните npm run build в папке client');
+  }
+  res.sendFile(CLIENT_INDEX, (err) => {
+    if (err) next(err);
+  });
+});
+
 // ============================================================
 // ЗАПУСК СЕРВЕРА
 // ============================================================

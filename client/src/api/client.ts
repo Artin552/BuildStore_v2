@@ -3,7 +3,14 @@
 
 const API_BASE = '/api';
 const DEFAULT_TIMEOUT_MS = 8000;
+export const UPLOAD_TIMEOUT_MS = 60000; // файлы отправляются дольше обычных запросов
 const TOKEN_KEY = 'token';
+
+// На эти коды сервер отвечает служебным английским текстом, поэтому показываем свой
+const STATUS_MESSAGES: Record<number, string> = {
+  413: 'Файлы слишком большие для отправки. Уменьшите их размер или количество.',
+  429: 'Слишком много попыток. Подождите немного и попробуйте снова.',
+};
 
 // Сервер ответил 401 на запрос с токеном: токен устарел. AuthContext слушает это событие.
 export const UNAUTHORIZED_EVENT = 'buildstore:unauthorized';
@@ -109,7 +116,8 @@ async function request<T>(path: string, options: ApiOptions): Promise<{ data: T;
     if (!res.ok) {
       if (res.status === 401 && token) window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
       const serverText = (payload as { error?: unknown } | undefined)?.error;
-      throw new ApiError(typeof serverText === 'string' ? serverText : `Ошибка сервера (${res.status})`, res.status);
+      const message = STATUS_MESSAGES[res.status] ?? (typeof serverText === 'string' ? serverText : `Ошибка сервера (${res.status})`);
+      throw new ApiError(message, res.status);
     }
     if (!isJson) throw new ApiError('Сервер прислал непонятный ответ. Попробуйте ещё раз.', res.status);
 
@@ -129,6 +137,33 @@ async function request<T>(path: string, options: ApiOptions): Promise<{ data: T;
 export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promise<T> {
   const { data } = await request<T>(path, options);
   return data;
+}
+
+// Скачать файл с проверкой прав. Обычная ссылка <a href> не отправляет токен, поэтому
+// закрытые файлы получаем через fetch. Blob — это содержимое файла в памяти браузера.
+export async function apiFetchBlob(path: string): Promise<Blob> {
+  const token = getToken();
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
+  try {
+    const res = await fetch(API_BASE + path, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      signal: controller.signal,
+    });
+    if (!res.ok) {
+      if (res.status === 401 && token) window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
+      const payload = (await res.json().catch(() => null)) as { error?: unknown } | null;
+      const message = typeof payload?.error === 'string' ? payload.error : `Ошибка сервера (${res.status})`;
+      throw new ApiError(message, res.status);
+    }
+    return await res.blob();
+  } catch (err) {
+    if (isAbortError(err)) throw new ApiError('Сервер не отвечает. Проверьте соединение и попробуйте ещё раз.', 0);
+    if (err instanceof TypeError) throw new ApiError('Не удалось соединиться с сервером.', 0);
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 // Запрос списка с пагинацией: вернёт элементы и общее число из заголовка X-Total-Count.

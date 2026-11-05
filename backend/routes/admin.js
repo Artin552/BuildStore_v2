@@ -7,6 +7,7 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const { requireStaff, requireAdmin, audit } = require('./roles');
+const { roleToJwt, DOCUMENTS_DIR } = require('./auth');
 
 const ORG_STATUSES = ['pending', 'approved', 'rejected'];
 const USER_STATUSES = ['active', 'pending', 'rejected', 'blocked'];
@@ -25,7 +26,7 @@ function orgToJson(row) {
     contactPosition: row.contact_position,
     phone: row.phone,
     email: row.email,
-    documents: docs.map(d => '/uploads/documents/' + d),
+    documents: docs.map(d => '/api/admin/documents/' + d),
     status: row.status,
     rejectReason: row.reject_reason,
     reviewedBy: row.reviewed_by,
@@ -48,10 +49,10 @@ function paging(req, defLimit) {
 // ============================================================
 router.get('/summary', requireStaff, (req, res) => {
   db.get(`SELECT
-      (SELECT COUNT(*) FROM organizations WHERE status = 'pending') AS pendingOrgs,
-      (SELECT COUNT(*) FROM organizations) AS totalOrgs,
-      (SELECT COUNT(*) FROM users) AS totalUsers,
-      (SELECT COUNT(*) FROM listings) AS totalListings`, [], (err, row) => {
+      (SELECT COUNT(*) FROM organizations WHERE status = 'pending') AS "pendingOrgs",
+      (SELECT COUNT(*) FROM organizations) AS "totalOrgs",
+      (SELECT COUNT(*) FROM users) AS "totalUsers",
+      (SELECT COUNT(*) FROM listings) AS "totalListings"`, [], (err, row) => {
     if (err) {
       console.error('DB error in /admin/summary:', err);
       return res.status(500).json({ error: 'Ошибка сервера' });
@@ -114,6 +115,18 @@ router.get('/organizations/:id', requireStaff, (req, res) => {
   );
 });
 
+// Файл документа организации: только для сотрудников (ТЗ 5.2).
+// Имя проверяем строго, чтобы через него нельзя было выйти из папки (например, ../../.env)
+router.get('/documents/:file', requireStaff, (req, res) => {
+  const file = req.params.file;
+  if (!/^[A-Za-z0-9_-]+\.(pdf|jpg|png)$/.test(file)) {
+    return res.status(404).json({ error: 'Документ не найден' });
+  }
+  res.sendFile(file, { root: DOCUMENTS_DIR }, (err) => {
+    if (err && !res.headersSent) res.status(404).json({ error: 'Документ не найден' });
+  });
+});
+
 // Решение модератора: подтвердить / отклонить (причина обязательна, ТЗ 6.2)
 router.post('/organizations/:id/review', requireStaff, (req, res) => {
   const id = Number(req.params.id);
@@ -142,10 +155,11 @@ router.post('/organizations/:id/review', requireStaff, (req, res) => {
           console.error('DB error updating organization:', uErr);
           return res.status(500).json({ error: 'Ошибка сервера' });
         }
-        // Статус пользователя-владельца синхронизируется со статусом заявки (ТЗ 5.3)
+        // Статус пользователя-владельца синхронизируется со статусом заявки (ТЗ 5.3).
+        // Заблокированного решение модератора не разблокирует: статус вернётся при разблокировке
         const userStatus = decision === 'approve' ? 'active' : 'rejected';
         db.run(
-          "UPDATE users SET status = ?, reject_reason = ? WHERE id = ? AND type = 'organization'",
+          "UPDATE users SET status = ?, reject_reason = ? WHERE id = ? AND type = 'organization' AND status <> 'blocked'",
           [userStatus, decision === 'reject' ? reason : null, org.user_id],
           (uErr2) => {
             if (uErr2) console.error('DB error updating user status:', uErr2);
@@ -232,7 +246,8 @@ router.get('/users', requireStaff, (req, res) => {
       (err, rows) => {
         if (err) return res.status(500).json({ error: 'Ошибка сервера' });
         res.set('X-Total-Count', cRow ? cRow.cnt : 0);
-        res.json(rows || []);
+        // Роль с учётом ADMIN_EMAILS: иначе такой админ показывался бы в списке как обычный пользователь
+        res.json((rows || []).map(row => ({ ...row, role: roleToJwt(row) })));
       }
     );
   });
@@ -245,13 +260,27 @@ router.post('/users/:id/block', requireAdmin, (req, res) => {
   if (id === req.staffUser.id) {
     return res.status(400).json({ error: 'Нельзя заблокировать самого себя' });
   }
-  db.get('SELECT id, email, role FROM users WHERE id = ?', [id], (err, row) => {
+  db.get('SELECT id, email, role, type FROM users WHERE id = ?', [id], (err, row) => {
     if (err) return res.status(500).json({ error: 'Ошибка сервера' });
     if (!row) return res.status(404).json({ error: 'Пользователь не найден' });
-    db.run("UPDATE users SET status = ? WHERE id = ?", [block ? 'blocked' : 'active', id], (uErr) => {
-      if (uErr) return res.status(500).json({ error: 'Ошибка сервера' });
-      audit(req.staffUser, block ? 'user.block' : 'user.unblock', 'user', id, row.email);
-      res.json({ success: true, status: block ? 'blocked' : 'active' });
+
+    const applyStatus = (newStatus) => {
+      db.run('UPDATE users SET status = ? WHERE id = ?', [newStatus, id], (uErr) => {
+        if (uErr) return res.status(500).json({ error: 'Ошибка сервера' });
+        audit(req.staffUser, block ? 'user.block' : 'user.unblock', 'user', id, row.email);
+        res.json({ success: true, status: newStatus });
+      });
+    };
+
+    if (block) return applyStatus('blocked');
+    if (row.type !== 'organization') return applyStatus('active');
+
+    // Организация возвращается в статус своей заявки. Иначе блокировка и разблокировка
+    // делали бы непроверенную организацию активной в обход модерации
+    db.get('SELECT status FROM organizations WHERE user_id = ? ORDER BY created_at DESC LIMIT 1', [id], (oErr, org) => {
+      if (oErr) return res.status(500).json({ error: 'Ошибка сервера' });
+      const statusByOrg = { approved: 'active', rejected: 'rejected' };
+      applyStatus(statusByOrg[org && org.status] || 'pending');
     });
   });
 });
@@ -292,9 +321,13 @@ router.get('/users/:id/listings', requireStaff, (req, res) => {
 // ============================================================
 router.get('/audit', requireStaff, (req, res) => {
   const { limit, offset } = paging(req, 50);
-  db.all('SELECT * FROM audit_log ORDER BY created_at DESC LIMIT ? OFFSET ?', [limit, offset], (err, rows) => {
-    if (err) return res.status(500).json({ error: 'Ошибка сервера' });
-    res.json(rows || []);
+  db.get('SELECT COUNT(*) AS cnt FROM audit_log', [], (cErr, cRow) => {
+    if (cErr) return res.status(500).json({ error: 'Ошибка сервера' });
+    db.all('SELECT * FROM audit_log ORDER BY created_at DESC LIMIT ? OFFSET ?', [limit, offset], (err, rows) => {
+      if (err) return res.status(500).json({ error: 'Ошибка сервера' });
+      res.set('X-Total-Count', cRow ? cRow.cnt : 0);
+      res.json(rows || []);
+    });
   });
 });
 
